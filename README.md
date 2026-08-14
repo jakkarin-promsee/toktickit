@@ -29,15 +29,23 @@ Connect as a PostgreSQL superuser and create the role and database the app expec
 ```sql
 CREATE USER toktickit WITH PASSWORD 'toktickit';
 CREATE DATABASE toktickit OWNER toktickit;
+ALTER ROLE toktickit CREATEDB;
 ```
 
-With `psql`, run the two statements one after another:
+With `psql`, run the three statements one after another:
 
 ```bash
 psql -U postgres -c "CREATE USER toktickit WITH PASSWORD 'toktickit';"
 psql -U postgres -c "CREATE DATABASE toktickit OWNER toktickit;"
+psql -U postgres -c "ALTER ROLE toktickit CREATEDB;"
 ```
 
+> `CREATEDB` is required by `prisma migrate dev` (step 4). Before applying a migration it replays
+> the whole `prisma/migrations/` history into a throwaway *shadow database* to detect drift between
+> the migration files and `schema.prisma`, then drops it. Without the grant the migration fails with
+> `P3014 — permission denied to create database`. Owning the `toktickit` database is not enough:
+> creating a database is a separate role attribute.
+>
 > On Windows `psql` may not be on your `PATH`; it ships at
 > `C:\Program Files\PostgreSQL\<version>\bin\psql.exe`.
 >
