@@ -12,10 +12,13 @@ datasource db {
 
 // ---------------------------------------------------------------------------
 // Issue 3 — Create and seed IT request categories
-// Define a Category model with:
-//   id        Int      @id @default(autoincrement())
-//   name      String   @unique
-//   createdAt DateTime @default(now())
-// Then run:  npx prisma migrate dev --name init
-// TODO(Issue 3): add the Category model below.
+// A supported request type a ticket can be filed under. The four rows are
+// reference data owned by the seed (prisma/seed.ts), not user input.
+// @unique on `name` is what makes re-running the seed safe: it is the lookup
+// key for upsert, and the database itself rejects a duplicate name.
 // ---------------------------------------------------------------------------
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
