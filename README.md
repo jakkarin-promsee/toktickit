@@ -13,6 +13,8 @@ status and lists the IT request categories stored in PostgreSQL.
 
 ## Setup
 
+Every command below is written to be run from the repository root, so return there between steps.
+
 ### 1. Clone and install
 
 ```bash
@@ -20,6 +22,7 @@ git clone https://github.com/jakkarin-promsee/toktickit.git
 cd toktickit
 cd server && npm install
 cd ../client && npm install
+cd ..
 ```
 
 ### 2. Create the database
@@ -59,6 +62,7 @@ Both sides ship a `.env.example`. Copy each to `.env` and adjust if your local v
 ```bash
 cd server && cp .env.example .env     # DATABASE_URL, PORT
 cd ../client && cp .env.example .env  # VITE_API_URL
+cd ..
 ```
 
 On PowerShell, use `Copy-Item .env.example .env` instead.
@@ -100,13 +104,18 @@ Test files live under `server/tests/lab-01/` and `client/tests/lab-01/`.
 
 ## API
 
-| Method | Endpoint          | Success response                                       |
-| ------ | ----------------- | ------------------------------------------------------ |
-| `GET`  | `/api/health`     | `200` `{ "status": "ok", "service": "TokTickIT API" }` |
-| `GET`  | `/api/categories` | Not implemented yet                                    |
+| Method | Endpoint          | Success response                                            |
+| ------ | ----------------- | ----------------------------------------------------------- |
+| `GET`  | `/api/health`     | `200` `{ "status": "ok", "service": "TokTickIT API" }`      |
+| `GET`  | `/api/categories` | `200` `[ { "id": 1, "name": "Account and Access" }, … ]`    |
+
+`/api/categories` returns every category as `id` and `name` only, ordered by `id`, so the list is
+reproducible between calls.
 
 `/api/health` is a liveness probe and never queries the database, so it stays `200` even while
-PostgreSQL is down.
+PostgreSQL is down. `/api/categories` does read the database and answers `503`
+`{ "error": "Database unavailable" }` when it cannot reach it — which is what turns the web page
+Offline even though the health check itself succeeded.
 
 ## Project structure
 

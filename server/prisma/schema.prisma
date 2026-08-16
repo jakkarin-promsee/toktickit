@@ -1,5 +1,6 @@
-// Prisma schema — datasource and generator are pre-wired.
-// Your DATABASE_URL lives in server/.env (copy it from .env.example).
+// Prisma schema for the TokTickIT database.
+// DATABASE_URL is read from server/.env, which is git-ignored; server/.env.example
+// carries the shape of it.
 
 generator client {
   provider = "prisma-client-js"

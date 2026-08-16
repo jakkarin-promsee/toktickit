@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { app } from "../../src/app.js";
 
-// WORKED EXAMPLE — this test is written for you. Study it, then implement the
-// /api/health route in src/app.ts until this test turns green. Use the same
-// pattern to write the categories test yourself (see categories.test.ts).
+// API-01. `toEqual` on the whole body rather than a field-by-field check, so
+// the test fails if the payload gains, loses, or renames anything — the
+// endpoint's contract is the shape, not just the status code.
 describe("GET /api/health", () => {
   it("returns 200 with status ok and the service name", async () => {
     const res = await request(app).get("/api/health");
