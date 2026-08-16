@@ -31,7 +31,7 @@ query contract and the database-outage path, which the four required tests leave
 
 ### **Server — Supertest (API-01 … API-04)**
 
-![[API.png]]
+![Server test suite passing](test-image/API.png)
 
 ```text
 PS C:\Users\BTCOM\Desktop\toktickit\server> npx vitest run --reporter=verbose
@@ -49,11 +49,9 @@ PS C:\Users\BTCOM\Desktop\toktickit\server> npx vitest run --reporter=verbose
    Duration  809ms (transform 175ms, setup 0ms, collect 750ms, tests 142ms, environment 1ms, prepare 440ms)
 ```
 
-![Server test suite passing](test-image/API.png)
-
 ### **Client — Vitest (UI-01 … UI-06)**
 
-![[UI.png]]
+![Client test suite passing](test-image/UI.png)
 
 ```text
 PS C:\Users\BTCOM\Desktop\toktickit\client> npx vitest run --reporter=verbose
@@ -72,8 +70,6 @@ PS C:\Users\BTCOM\Desktop\toktickit\client> npx vitest run --reporter=verbose
    Start at  21:08:57
    Duration  1.51s (transform 64ms, setup 68ms, collect 171ms, tests 325ms, environment 423ms, prepare 111ms)
 ```
-
-![Client test suite passing](test-image/UI.png)
 
 ### API-01 — `GET /api/health`
 
