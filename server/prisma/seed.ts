@@ -28,10 +28,14 @@ async function main() {
   console.log(`Seeded ${CATEGORY_NAMES.length} categories (${total} rows total).`);
 }
 
+// process.exitCode, not process.exit(): exit() tears the process down without
+// draining the microtask queue, so the .finally() below never runs and the
+// connection is left open on the failure path. Setting the code lets the chain
+// finish and Node still exits non-zero once the event loop empties.
 main()
   .catch((e) => {
     console.error(e);
-    process.exit(1);
+    process.exitCode = 1;
   })
   .finally(async () => {
     await getPrisma().$disconnect();
