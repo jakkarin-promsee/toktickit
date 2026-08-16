@@ -4,11 +4,14 @@ node_modules/
 .env
 *.env
 !.env.example
-# build output
+# build output & caches
 dist/
 build/
+.vite/
 # prisma
 server/prisma/*.db
 # logs & OS
 *.log
 .DS_Store
+# editor/workspace state
+.obsidian/

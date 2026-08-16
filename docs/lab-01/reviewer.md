@@ -1,8 +1,8 @@
 # Lab 1 — Peer Review Record
 
-| Role | Full Name | Student ID | GitHub username |
-| --- | --- | --- | --- |
-| **Author** | Jakkarin Promsee | 67070501009 | [@jakkarin-promsee](https://github.com/jakkarin-promsee) |
+| Role              | Full Name         | Student ID  | GitHub username                                          |
+| ----------------- | ----------------- | ----------- | -------------------------------------------------------- |
+| **Author**        | Jakkarin Promsee  | 67070501009 | [@jakkarin-promsee](https://github.com/jakkarin-promsee) |
 | **Peer reviewer** | Achirawish Prasom | 67070501076 | [@UsernameJillzaza](https://github.com/UsernameJillzaza) |
 
 Every review is quoted verbatim. Text in a `>` quote block is the **reviewer's own words**;
@@ -17,21 +17,21 @@ plain text under it is the **author's response**.
 
 ### PRs I authored — reviewed by my partner
 
-| PR | Issue | Title | Branch | Verdict |
-| --- | --- | --- | --- | --- |
-| [#5](https://github.com/jakkarin-promsee/toktickit/pull/5) | #1 | Set up the TokTickIT project foundation | `feature/1-project-foundation` | ✅ Approved |
-| [TO FILL: link] | #2 | Implement the API health check | `feature/2-health-check` | [TO FILL] |
-| [TO FILL: link] | #3 | Create and seed IT request categories | `feature/3-category-seed` | [TO FILL] |
-| [TO FILL: link] | #4 | Display the IT request category list | `feature/4-category-list` | [TO FILL] |
+| PR                                                         | Issue | Title                                   | Branch                         | Verdict     |
+| ---------------------------------------------------------- | ----- | --------------------------------------- | ------------------------------ | ----------- |
+| [#5](https://github.com/jakkarin-promsee/toktickit/pull/5) | #1    | Set up the TokTickIT project foundation | `feature/1-project-foundation` | ✅ Approved |
+| [TO FILL: link]                                            | #2    | Implement the API health check          | `feature/2-health-check`       | [TO FILL]   |
+| [TO FILL: link]                                            | #3    | Create and seed IT request categories   | `feature/3-category-seed`      | [TO FILL]   |
+| [TO FILL: link]                                            | #4    | Display the IT request category list    | `feature/4-category-list`      | [TO FILL]   |
 
 ### PRs I reviewed — authored by my partner
 
-| PR | Issue | Title | Branch | Verdict I gave |
-| --- | --- | --- | --- | --- |
-| [TO FILL: link to partner's repo PR] | #1 | Set up the TokTickIT project foundation | `feature/1-project-foundation` | ✅ Approved |
-| [TO FILL: link] | #2 | Implement the API health check | `feature/2-health-check` | [TO FILL] |
-| [TO FILL: link] | #3 | Create and seed IT request categories | `feature/3-category-seed` | [TO FILL] |
-| [TO FILL: link] | #4 | Display the IT request category list | `feature/4-category-list` | [TO FILL] |
+| PR                                   | Issue | Title                                   | Branch                         | Verdict I gave |
+| ------------------------------------ | ----- | --------------------------------------- | ------------------------------ | -------------- |
+| [TO FILL: link to partner's repo PR] | #1    | Set up the TokTickIT project foundation | `feature/1-project-foundation` | ✅ Approved    |
+| [TO FILL: link]                      | #2    | Implement the API health check          | `feature/2-health-check`       | [TO FILL]      |
+| [TO FILL: link]                      | #3    | Create and seed IT request categories   | `feature/3-category-seed`      | [TO FILL]      |
+| [TO FILL: link]                      | #4    | Display the IT request category list    | `feature/4-category-list`      | [TO FILL]      |
 
 ---
 
@@ -179,7 +179,6 @@ Read carefully, check the thing on the comment said, then merge into lab1-stagin
 >    `"prisma": { "seed": "..." }`, otherwise a fresh clone gets an empty table and
 >    an empty list in the UI, with no error to explain why. Is the seed wired into
 >    package.json? If not, could we add an explicit `npx prisma db seed` as step 5?
->
 > 2. **`psql` on PATH.** Step 2 assumes it's available. On a default Windows
 >    PostgreSQL install it isn't unless "Command Line Tools" was ticked. One extra
 >    clause "or create it in pgAdmin" saves the next person from getting stuck
