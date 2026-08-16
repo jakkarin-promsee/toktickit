@@ -14,12 +14,14 @@ app.use(express.json());
 
 // ---------------------------------------------------------------------------
 // Issue 2 — API health check
-// Make the test in tests/lab-01/health.test.ts pass.
-// It must return HTTP 200 with JSON: { status: "ok", service: "TokTickIT API" }
+// Liveness probe: answers "is this process up and serving HTTP?".
+// It deliberately does NOT touch the database — a readiness check would, and
+// coupling the two would make the API report itself dead whenever Postgres is
+// merely slow. Keeping it DB-free is also what lets the Supertest suite run
+// without a running database.
 // ---------------------------------------------------------------------------
 app.get("/api/health", (_req: Request, res: Response) => {
-  // TODO(Issue 2): replace this stub with the required 200 response.
-  res.status(501).json({ error: "Not implemented yet" });
+  res.status(200).json({ status: "ok", service: "TokTickIT API" });
 });
 
 // ---------------------------------------------------------------------------

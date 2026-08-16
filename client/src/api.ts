@@ -10,12 +10,33 @@ export interface SystemStatus {
   categories: Category[];
 }
 
+// Shape promised by GET /api/health (labsheet section 10.1).
+interface HealthResponse {
+  status: string;
+  service: string;
+}
+
 // Issue 2 + Issue 4 — call the backend.
-// Steps: fetch `${API_URL}/api/health`; if not ok, throw.
-//        then fetch `${API_URL}/api/categories`; if not ok, throw.
-//        return { online: true, categories }.
-// Throwing on failure lets the UI show a single Offline/error state.
+// Every failure path throws, so the UI only has to handle one error state
+// instead of inspecting status codes itself.
+// TODO(Issue 4): fetch `${API_URL}/api/categories` after the health check and
+// return the real list instead of the empty one below.
 export async function checkSystem(): Promise<SystemStatus> {
-  // TODO(Issue 2 & 4): implement the two fetch calls described above.
-  throw new Error("checkSystem not implemented yet");
+  // A dead backend rejects here with a TypeError ("Failed to fetch") instead of
+  // returning a response, so the caller's catch covers that case too.
+  const response = await fetch(`${API_URL}/api/health`);
+
+  if (!response.ok) {
+    throw new Error(`Health check failed with HTTP ${response.status}`);
+  }
+
+  const body = (await response.json()) as Partial<HealthResponse>;
+
+  // A 200 alone is not proof of health: the contract is the payload, so an
+  // unexpected body has to be treated as an outage rather than as success.
+  if (body.status !== "ok" || body.service !== "TokTickIT API") {
+    throw new Error("Health check returned an unexpected payload");
+  }
+
+  return { online: true, categories: [] };
 }

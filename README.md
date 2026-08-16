@@ -100,10 +100,13 @@ Test files live under `server/tests/lab-01/` and `client/tests/lab-01/`.
 
 ## API
 
-| Method | Endpoint          | Success response    |
-| ------ | ----------------- | ------------------- |
-| `GET`  | `/api/health`     | Not implemented yet |
-| `GET`  | `/api/categories` | Not implemented yet |
+| Method | Endpoint          | Success response                                       |
+| ------ | ----------------- | ------------------------------------------------------ |
+| `GET`  | `/api/health`     | `200` `{ "status": "ok", "service": "TokTickIT API" }` |
+| `GET`  | `/api/categories` | Not implemented yet                                    |
+
+`/api/health` is a liveness probe and never queries the database, so it stays `200` even while
+PostgreSQL is down.
 
 ## Project structure
 
