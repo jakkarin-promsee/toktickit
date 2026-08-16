@@ -14,25 +14,35 @@ them again in every prompt.
 
 ## Selected key prompts
 
-| #   | Prompt name                                                                             | Used during                            | What I asked for                                                                   | Tool                  |
-| --- | --------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------- | --------------------- |
-| 1   | CPE334 lab1 ใบงาน เเละเนื้อหาที่เกี่ยวข้อง                                              | Planning — before any code              | Teach me the Git and GitHub workflow this lab requires, terminal and website        | Claude (vault)        |
-| 2   | CPE334 lab1 ใบงาน เเละเนื้อหาที่เกี่ยวข้อง (สรุปทุกอย่าง ทำ guidebook เอาไว้กลับมาอ่าน) | Planning — after ~20 discussion prompts | Turn that discussion into a phase-by-phase guidebook I could follow while building  | Claude (vault)        |
-| 3   | Issue #1 recheck and verifies before commit and open PR                                 | Issue #1 — before opening the PR        | Audit the foundation against its acceptance criteria and hand me a manual checklist | Claude (vault → repo) |
-| 4   | Issue #2 working                                                                        | Issue #2 — implementation               | Explore the repo, confirm my branch order was right, then write the health check    | Claude (repo)         |
-| 5   | Issue #3 recheck after pull feature/2                                                   | Issue #3 — after merging `lab1-staging` | Re-verify the branch with #2 merged in, then commit the merge                       | Claude (repo)         |
-| 6   | Issue #3 resolve PR changes request                                                     | Issue #3 — after peer review            | Apply the two changes my reviewer requested, as two separate commits                | Claude (repo)         |
-| 7   | CPE334 lab1 จัดการเอกสาร                                                                | Docs — alongside Issues #1–#4           | Restructure the three lab-01 documents so they read well when rendered              | Claude (vault → repo) |
-| 8   | [TO FILL: prompt name]                                                                  | [TO FILL: which issue / stage]          | [TO FILL: one line on what the prompt asked the agent to do]                        | [TO FILL]             |
+| #   | Prompt name                                             | What I asked for                                                                                                               | What I did with the result                                                                                                                                                                                                                                                                                                                     |
+| --- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | CPE334 lab1 ใบงาน เเละเนื้อหาที่เกี่ยวข้อง              | Teach me the Git and GitHub workflow this lab requires, terminal and website                                                   | Got all the git commands, how to open a project board, how to use git, etc.<br><br>I read it carefully. Then I created a test repo to try the actual git commands, and a project board to see how it works.                                                                                                                                    |
+| 2   | CPE334 lab1 สรุปทุกอย่าง ทำ guidebook เอาไว้กลับมาอ่าน  | Turn that discussion into a phase-by-phase guidebook I could follow while building                                             | Got the whole Lab 1 description and a todo list.<br><br>I read it carefully, then discussed more about what I did not understand and how to do the items on that list.<br><br>Then after a very long conversation I asked the agent to write Lab1_Guidance.md. It holds all the conversation detail, so I can open and read it any time later. |
+| 3   | Issue #1 recheck and verifies before commit and open PR | Audit the foundation against its acceptance criteria and hand me a manual checklist                                            | Got a full re-test of Issue #1. It verified that I could push to GitHub, then open the PR.<br><br>I read its commands carefully to check whether they were right. Then once I was sure, I pushed and opened my first PR.                                                                                                                       |
+| 4   | Issue #2 working                                        | Explore the repo, confirm my branch order was right, then write the health check                                               | Got all the code following the Issue #2 criteria.<br><br>I read its output carefully and checked the order it wrote the code in and how it tested. Then I re-tested everything myself, pushed, and opened the PR.                                                                                                                              |
+| 5   | Issue #3 recheck after pull feature/2                   | Re-verify the branch with #2 merged in, then commit the merge                                                                  | Got everything verified — the current branch and commit history were right, everything worked, nothing missing.<br><br>I read its commands carefully again to make sure its tests were completely right, because this point in the branch order really mattered. Then I pushed and opened the PR for Issue #3.                                 |
+| 6   | Issue #3 resolve PR changes request                     | Apply the two changes my reviewer requested, as two separate commits                                                           | Got both requested changes resolved, and tested everything again.<br><br>I verified it worked, then pushed and sent a re-request review to my peer.                                                                                                                                                                                            |
+| 7   | CPE334 Lab 1 Issue #4 Category list                     | Explore the repo, then write all todo list for #4 (Because this issues is a bit large compare to before). Then complete the #4 | Got a todo list covering every Issue #4 criterion, and the code following that list.<br><br>I read the todo list and compared it against the lab sheet carefully, then read the code step by step. I re-ran every test and checked the app in the browser myself, including the failure cases.                                                 |
+| 8   | CPE334 lab1 จัดการเอกสาร                                | Restructure the three lab-01 documents so they read well when rendered                                                         | Got a final document structure.<br><br>I followed that structure to make my docs easier to read.                                                                                                                                                                                                                                               |
 
-> The lab sheet asks for 6–10 prompts. Slot 8 is a placeholder — delete it if it stays unused.
+## Reflection on improving my prompts
+
+1. To make the AI agent work efficiently, I have to write the context clearly. The things I have to include are:
+	1. What I want the agent to do
+	2. Where the related documents or files are
+	3. How it should do it (working constraints or limitations)
+	4. What my current context on this task is
+2. Do not trust the AI 100%, even when it shows its test commands, because the agent can have blind spots or, worse, hallucinate. I have to recheck and retest it myself one more time.
+3. Sometimes the agent does more than it was asked to, and some of that creates conflicts later. I have to tell it clearly:
+	1. What the main thing it should do is
+	2. What it is not allowed to touch
+4. Sometimes the agent misunderstands my prompt badly. I have to stop all the work and explain the prompt one more time, pointing out exactly which part it misunderstood and what the right reading is.
 
 ---
 
-### 1 — CPE334 lab1 ใบงาน เเละเนื้อหาที่เกี่ยวข้อง
+## Actual Prompt
 
-**Context:** run inside the course vault, where the agent can grep every class document and reads
-`CLAUDE.md` for the doc index and class-specific context.
+### 1 — CPE334 lab1 ใบงาน เเละเนื้อหาที่เกี่ยวข้อง
 
 ```text
 อ่าน C:\Users\BTCOM\Desktop\1_Uni\CPE334-software-engineering\assignment\Lab-1\Lab1_Labsheet.md
@@ -45,12 +55,7 @@ them again in every prompt.
 ว่าโปรเจคจริงต้องทำขึ้นตอนอะไรบ้างอ่ะ ขอเนื้อหาเเบบครบๆเลย
 ```
 
-**Reflection:** [TO FILL: 1–3 sentences]
-
-### 2 — CPE334 lab1 ใบงาน เเละเนื้อหาที่เกี่ยวข้อง (สรุปทุกอย่าง ทำ guidebook เอาไว้กลับมาอ่าน)
-
-**Context:** after the discussion above was finished (~20+ prompts), I asked for a step-by-step
-guidebook covering everything from an empty folder to the end of Issue #4, to read back later.
+### 2 — CPE334 lab1 สรุปทุกอย่าง ทำ guidebook เอาไว้กลับมาอ่าน
 
 ```text
 งั้นฝากสร้าง lab1-guidance หน่อยดิ อ่านจาก
@@ -61,18 +66,12 @@ C:\Users\BTCOM\Desktop\1_Uni\CPE334-software-engineering\assignment\Lab-1\Lab1_L
 เดี๋ยวกุไปตามอ่าน เเล้วใช้อ้างอิงตอนทำ step by step
 ```
 
-**Reflection:** [TO FILL: 1–3 sentences]
-
 ### 3 — Issue #1 recheck and verifies before commit and open PR
-
-**Context:** run from the course vault, but pointed at the local project folder.
 
 ```text
 ฝากเช็คงาน CPE334 lab 1 หน่อยดิ กุไปทำที่ C:\Users\BTCOM\Desktop\toktickit อ่ะ
 กุคิดว่า ISSUE 1 น่าจะเสร็จเเล้วนะ เเต่ไม่เเน่ใจว่าครบเเล้วยังอ่ะ เอาเเบบละเอียดๆเลยนะ เเล้วก็สร้าง checklist มาให้กุด้วย ว่าตรวจด้วยมือยังไง เเละผลลัพธ์ควรเป็นยังไง ทำเผื่อไว้อีกรอบหนึ่ง
 ```
-
-**Reflection:** [TO FILL: 1–3 sentences]
 
 ### 4 — Issue #2 working
 
@@ -130,8 +129,6 @@ Depends on: #1
 ถ้าทุกอย่างปกติเรียบร้อยดี ต่อไปเราจะไปเริ่มเขียนโค้ดกัน
 ````
 
-**Reflection:** [TO FILL: 1–3 sentences]
-
 ### 5 — Issue #3 recheck after pull feature/2
 
 ```text
@@ -146,8 +143,6 @@ Depends on: #1
 ฝากช่วยเช็คหน่อย
 ```
 
-**Reflection:** [TO FILL]
-
 ### 6 — Issue #3 resolve PR changes request
 
 ```text
@@ -156,7 +151,7 @@ Depends on: #1
 2. Issue #2 ทำเสร็จเเล้ว, merge feature/2-health-check ไปที่ lab1-staging เเล้ว
 3. กลับมาที่ feature/3-category-seed, จากนั้นใช้ `git pull origin lab1-staging` ทำให้ในตอนนี้ branch ของ feature 3 มี feature 1 กับ 2 ที่เสร็จเเล้ว
 4. เช็คความเรียบร้อยทุกอย่าง จากนั้น push ขึ้นไป เปิด PR เเล้ว
-   
+
 เเต่ว่า PR นี้เพื่อนกุกดส่ง change request มา
 
 Summary:
@@ -206,9 +201,74 @@ process.exitCode sets the same exit status without killing the process, so the p
 ถ้าทุกอย่างปกติเรียบร้อยดี ต่อไปเราจะไปเริ่มเขียนโค้ดกัน
 ```
 
-**Reflection:** [TO FILL]
+### 7 — CPE334 Lab 1 Issue #4 Category list
 
-### 7 — CPE334 lab1 จัดการเอกสาร
+```text
+วันนี้มึงจะมาช่วยกุทำงานใน CPE334 lab 1 หน้าที่ของมึงคือช่วยกุเขียนโค้ด กับเช็คว่ากุทำถูกต้องตาม instruction ในใบ lab มั้ย
+
+เอกสารหลักในการอ้างอิงคือ
+
+1. C:\Users\BTCOM\Desktop\1_Uni\CPE334-software-engineering\assignment\Lab-1\Lab1_Labsheet.md , อันนี้เป็น official lab sheet
+
+2. C:\Users\BTCOM\Desktop\1_Uni\CPE334-software-engineering\assignment\Lab-1\Lab1_Guidance.md , อันนี้เป็นอันที่กุเอา official มาจัดเรียนใหม่ ตามลำดับ
+
+ตัว local project ของกุอยู่ที่ C:\Users\BTCOM\Desktop\toktickit
+
+เเละ root ของมึงอยู่ที่ C:\Users\BTCOM\Desktop\toktickit\1_Uni ระวังด้วย
+
+ตอนนี้กุทำ issue #1 - Issue #3 เสร็จละ เหลือเเค่ Issue 4 ตัวเดียวเเล้ว เเล้วตอนนี้กุเอา lab1-staging ตัวล่าสุดที่ merge หมดเเล้ว เเยกออกมา branch feature/4-category-list ให้ละ
+
+---
+
+สิ่งที่เหลืออยู่ตอนนี้คือ
+
+1. เขียนโค้ดให้ครบตาม issue #4 criterial
+
+Type: Feature
+Branch: `feature/4-category-list`
+Target: `lab1-staging`
+Depends on: #3 (must already be merged into `lab1-staging`)
+
+## Acceptance criteria
+- [ ] `GET /api/categories` retrieves categories from PostgreSQL through Prisma
+- [ ] The API returns each category ID and name in a predictable order
+- [ ] A Supertest test verifies the response
+- [ ] React displays the categories returned by the API, not hard-coded values
+- [ ] Loading and error states are shown
+- [ ] A Vitest test verifies the category-list UI behavior
+
+## Expected response
+GET /api/categories → 200 OK
+[
+  { "id": 1, "name": "Account and Access" },
+  { "id": 2, "name": "Hardware" },
+  { "id": 3, "name": "Software" },
+  { "id": 4, "name": "Network" }
+]
+
+2. Commit progress เข้า feature/4-category-list
+
+3. push ขึ้น global สร้าง PR เเล้วก็รอเพื่อนกุ approve
+
+(เรื่อง project board กุทำหมดเเล้ว เเต่ไม่เขียนไว้ ไม่ต้องกังวล)
+
+---
+
+วันนี้กุอยากให้มึงทำ:
+
+1. ช่วยกุอ่านเอกสารทุกอย่างอีกรอบ เเล้วเขียน todo list ทั้งหมดมาว่าที่ Issue #4 เราต้อง implement อะไร ทำอะไรตรงไหนบ้าง เเบบครบๆเลย เพราะว่าอันนี้เป็น issue สุท้ายเเล้ว กุไม่อยากพลาดอะไร
+    
+2. จากมึงค่อยไปเขียนโค้ดทุกอย่าง ตาม todo list ที่พึ่งไปทำมา
+    
+3. เเละสุดท้าย เราก็จะมาทำ final test อีกที เพื่อ make sure ว่าตอนนี้มันส่งได้เเล้วจริงๆ
+    
+
+จากนั้นกุก็จะ commit เเล้วเอาไปสร้าง PR เอง
+
+ถ้ามึงสงสัยตรงไหน สามารถถามกุได้ทุกเวลาเลย ตอนนี้ให้มึงไป Explore เอกสาร กับโค้ดทุกอย่างก่อน เเล้วเดี๋ยวต่อไปเราจะไปเริ่มทำ 1. เเล้วก็ข้ออื่นๆ step by step
+```
+
+### 8 — CPE334 lab1 จัดการเอกสาร
 
 ```text
 ตอนนี้กุกำลังเติมเขื้อหาลงในเอกสารใน CPE334 lab1 อยู่อ่ะ
@@ -225,23 +285,4 @@ process.exitCode sets the same exit status without killing the process, so the p
 3. เเล้วก็ตรง tests.md ก็ฝากจัดหน้าด้วยเหมือนกัน
 ```
 
-**Reflection:** [TO FILL]
-
-### 8 — [TO FILL: prompt name]
-
-```text
-[TO FILL: paste the actual prompt text]
-```
-
-**Reflection:** [TO FILL]
-
 ---
-
-## Reflection on improving my prompts
-
-[TO FILL: 2–3 short paragraphs. What made the prompts better — for example pasting the acceptance
-criteria in verbatim, naming the exact files to read, stating what NOT to do, splitting the work
-into one small task at a time.]
-
-[TO FILL: one place where I had to correct or reject what the agent produced, and why I was right
-to overrule it.]
