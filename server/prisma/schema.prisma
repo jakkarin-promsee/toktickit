@@ -1,0 +1,25 @@
+// Prisma schema for the TokTickIT database.
+// DATABASE_URL is read from server/.env, which is git-ignored; server/.env.example
+// carries the shape of it.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Issue 3 — Create and seed IT request categories
+// A supported request type a ticket can be filed under. The four rows are
+// reference data owned by the seed (prisma/seed.ts), not user input.
+// @unique on `name` is what makes re-running the seed safe: it is the lookup
+// key for upsert, and the database itself rejects a duplicate name.
+// ---------------------------------------------------------------------------
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
