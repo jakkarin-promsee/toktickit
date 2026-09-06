@@ -1,10 +1,11 @@
 # TokTickIT
 
-A three-role IT service desk — CPE334 Lab 1 vertical slice. The React frontend reports live backend
-status and lists the IT request categories stored in PostgreSQL.
+A requester-facing IT service desk for CPE334 Lab 2. A seeded Development Requester can create,
+find, and inspect owned Tickets and manage validated Attachments through a responsive Zen Green UI.
+The selector is a test context only; real authentication is deferred to Lab 3.
 
 - **Stack:** React + TypeScript + Vite + Bootstrap → Express + TypeScript → Prisma ORM → PostgreSQL
-- **Tests:** Vitest (unit/UI) + Supertest (API)
+- **Tests:** Vitest (unit/UI) + Supertest (API) + Playwright (E2E/responsive/accessibility)
 
 ## Prerequisites
 
@@ -20,6 +21,7 @@ Every command below is written to be run from the repository root, so return the
 ```bash
 git clone https://github.com/jakkarin-promsee/toktickit.git
 cd toktickit
+npm install
 cd server && npm install
 cd ../client && npm install
 cd ..
@@ -77,7 +79,9 @@ npx prisma migrate dev
 npx prisma db seed
 ```
 
-The seed is idempotent — running it more than once will not create duplicate categories.
+The seed is idempotent — running it more than once will not create duplicate categories, related
+systems, or Development Requesters. Stable category/system names and Requester email addresses are the
+upsert keys.
 
 ### 5. Run both sides
 
@@ -91,16 +95,27 @@ cd server && npm run dev   # API  → http://localhost:3000
 cd client && npm run dev   # web  → http://localhost:5173
 ```
 
-Open http://localhost:5173 and click **Check System**.
+Open http://localhost:5173, select an active Development Requester, and continue to My Tickets.
 
 ## Tests
 
 ```bash
-cd server && npm test   # Supertest — API endpoints
-cd client && npm test   # Vitest — UI states
+npm --prefix server test   # Supertest — API endpoints
+npm --prefix client test   # Vitest — UI states
+npm test                    # Both server and client suites
+npm run test:e2e            # Playwright — browser, responsive, accessibility, screenshots
+npm run test:all            # Unit/API/UI followed by Playwright
 ```
 
-Test files live under `server/tests/lab-01/` and `client/tests/lab-01/`.
+Server tests reset and seed the isolated PostgreSQL schema `lab2_test`. Playwright resets and seeds
+`lab2_e2e`, uses temporary Attachment storage under `.tmp/`, and starts isolated services on ports 3100
+and 5174. Development data in the default `public` schema is not changed. Override the defaults with
+`TEST_DATABASE_URL`, `PLAYWRIGHT_DATABASE_URL`, or `PLAYWRIGHT_ATTACHMENT_STORAGE`.
+
+Install the browser once with `npx playwright install chromium`. On this Windows workstation Playwright
+may use the installed Chrome executable; CI should install Chromium or set `PLAYWRIGHT_EXECUTABLE_PATH`.
+
+Test files live under `server/tests/`, `client/tests/`, and `e2e/lab-02/`. Playwright screenshots are written to `artifacts/lab-02/screenshots/`.
 
 ## API
 
@@ -123,24 +138,21 @@ Offline even though the health check itself succeeded.
 toktickit/
 ├── client/                 React + TypeScript + Vite frontend
 │   ├── src/
-│   └── tests/lab-01/
+│   └── tests/lab-01/ and tests/lab-02/
 ├── server/                 Express + TypeScript API
 │   ├── prisma/             schema + seed
 │   ├── src/
-│   └── tests/lab-01/
+│   └── tests/lab-01/ and tests/lab-02/
 ├── docs/lab-01/            tests.md · reviewer.md · ai_use.md
+├── docs/lab-02/            contract, test plan, and integration evidence
+├── e2e/lab-02/             Playwright integration and responsive tests
+├── artifacts/lab-02/       reviewed visual evidence
 ├── .gitignore
 └── README.md
 ```
 
 ## Git workflow
 
-Feature branches target `lab1-staging`; `lab1-staging` is released into `main` by pull request.
-No development happens directly on `main` or `lab1-staging`, and every PR requires a peer review.
-
-| Issue                         | Feature branch                 | PR target      |
-| ----------------------------- | ------------------------------ | -------------- |
-| 1. Project foundation         | `feature/1-project-foundation` | `lab1-staging` |
-| 2. API health check           | `feature/2-health-check`       | `lab1-staging` |
-| 3. Create and seed categories | `feature/3-category-seed`      | `lab1-staging` |
-| 4. Category list              | `feature/4-category-list`      | `lab1-staging` |
+Lab 2 feature branches `feature/10-*` through `feature/17-*` target `lab2-staging`. Each feature enters
+staging through a peer-reviewed PR. Issue #18 tracks the final release PR from `lab2-staging` to `main`.
+No feature development happens directly on `main` or `lab2-staging`.

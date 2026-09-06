@@ -5,6 +5,156 @@ export interface Category {
   name: string;
 }
 
+export interface RelatedSystem {
+  id: number;
+  name: string;
+}
+
+export type RequestedPriority = "LOW" | "MEDIUM" | "HIGH";
+
+export interface CreatedTicket {
+  id: string;
+  ticketNumber: string;
+  ticketDate: string;
+  requester: { id: number; displayName: string };
+  category: Category;
+  relatedSystem: RelatedSystem;
+  summary: string;
+  requestedPriority: RequestedPriority;
+  itPriority: "UNASSIGNED";
+  currentStatus: "NEW";
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketListItem {
+  id: string;
+  ticketNumber: string;
+  summary: string;
+  category: Category;
+  relatedSystem: RelatedSystem;
+  requestedPriority: RequestedPriority;
+  itPriority: "UNASSIGNED" | "LOW" | "MEDIUM" | "HIGH";
+  currentStatus: "NEW";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketAttachmentMetadata {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  state: "ACTIVE" | "REMOVED";
+  uploadedByDisplayName: string;
+  createdAt: string;
+  removedAt: string | null;
+  removedByDisplayName: string | null;
+  removalReason: string | null;
+}
+
+export interface TicketDetail extends CreatedTicket {
+  attachments: TicketAttachmentMetadata[];
+}
+
+export async function uploadAttachment(
+  requesterId: number,
+  ticketId: string,
+  file: File,
+): Promise<TicketAttachmentMetadata> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+    method: "POST",
+    headers: { "X-Requester-Id": String(requesterId) },
+    body: form,
+  });
+  const payload = (await response.json()) as {
+    data?: TicketAttachmentMetadata;
+    error?: { message?: string };
+  };
+  if (!response.ok || !payload.data) {
+    const error = new Error(payload.error?.message ?? "Attachment could not be uploaded.") as Error & {
+      status?: number;
+    };
+    error.status = response.status;
+    throw error;
+  }
+  return payload.data;
+}
+
+export async function removeAttachment(
+  requesterId: number,
+  attachmentId: string,
+  reason: string,
+): Promise<TicketAttachmentMetadata> {
+  const response = await fetch(`${API_URL}/api/attachments/${attachmentId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requester-Id": String(requesterId),
+    },
+    body: JSON.stringify({ reason }),
+  });
+  const payload = (await response.json()) as {
+    data?: TicketAttachmentMetadata;
+    error?: { message?: string };
+  };
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Attachment could not be removed.");
+  }
+  return payload.data;
+}
+
+export function attachmentDownloadUrl(attachmentId: string, inline = false): string {
+  return `${API_URL}/api/attachments/${attachmentId}/download${inline ? "?disposition=inline" : ""}`;
+}
+
+export async function downloadAttachment(
+  requesterId: number,
+  attachmentId: string,
+  inline = false,
+): Promise<Blob> {
+  const response = await fetch(attachmentDownloadUrl(attachmentId, inline), {
+    headers: { "X-Requester-Id": String(requesterId) },
+  });
+  if (!response.ok) {
+    throw new Error("Attachment could not be downloaded.");
+  }
+  return response.blob();
+}
+
+export interface TicketListQuery {
+  search?: string;
+  categoryId?: number;
+  relatedSystemId?: number;
+  status?: "NEW";
+  requestedPriority?: RequestedPriority;
+  sortBy?: "updatedAt" | "createdAt" | "ticketNumber" | "summary";
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: 10 | 20 | 50;
+}
+
+export interface TicketListResponse {
+  data: TicketListItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+  };
+}
+
+export interface DevelopmentRequester {
+  id: number;
+  displayName: string;
+  email: string;
+}
+
 export interface SystemStatus {
   online: boolean;
   categories: Category[];
@@ -66,11 +216,142 @@ export async function checkSystem(): Promise<SystemStatus> {
   return { online: true, categories: payload as Category[] };
 }
 
+export async function getDevelopmentRequesters(): Promise<
+  DevelopmentRequester[]
+> {
+  const response = await fetch(`${API_URL}/api/requesters`);
+
+  if (!response.ok) {
+    throw new Error(`Requester list failed with HTTP ${response.status}`);
+  }
+
+  const payload: unknown = await response.json();
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !Array.isArray((payload as { data?: unknown }).data) ||
+    !(payload as { data: unknown[] }).data.every(isRequester)
+  ) {
+    throw new Error("Requester list returned an unexpected payload");
+  }
+
+  return (payload as { data: DevelopmentRequester[] }).data;
+}
+
+async function getReferenceItems(path: string): Promise<Category[]> {
+  const response = await fetch(`${API_URL}${path}`);
+  if (!response.ok) {
+    throw new Error(`Reference data failed with HTTP ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload) || !payload.every(isCategory)) {
+    throw new Error("Reference data returned an unexpected payload");
+  }
+  return payload;
+}
+
+export function getCategories(): Promise<Category[]> {
+  return getReferenceItems("/api/categories");
+}
+
+export function getRelatedSystems(): Promise<RelatedSystem[]> {
+  return getReferenceItems("/api/related-systems");
+}
+
+export async function getMyTickets(
+  requesterId: number,
+  query: TicketListQuery = {},
+): Promise<TicketListResponse> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const queryString = params.toString();
+  const response = await fetch(
+    `${API_URL}/api/tickets${queryString ? `?${queryString}` : ""}`,
+    { headers: { "X-Requester-Id": String(requesterId) } },
+  );
+  const payload = (await response.json()) as {
+    data?: TicketListItem[];
+    pagination?: TicketListResponse["pagination"];
+    error?: { message?: string };
+  };
+  if (!response.ok || !Array.isArray(payload.data) || !payload.pagination) {
+    throw new Error(payload.error?.message ?? "Tickets could not be loaded.");
+  }
+  return { data: payload.data, pagination: payload.pagination };
+}
+
+export async function getTicketDetail(
+  requesterId: number,
+  ticketId: string,
+): Promise<TicketDetail> {
+  const response = await fetch(`${API_URL}/api/tickets/${ticketId}`, {
+    headers: { "X-Requester-Id": String(requesterId) },
+  });
+  const payload = (await response.json()) as {
+    data?: TicketDetail;
+    error?: { message?: string };
+  };
+  if (!response.ok || !payload.data) {
+    const error = new Error(
+      response.status === 404
+        ? "We couldn't find this ticket."
+        : payload.error?.message ?? "Ticket could not be loaded.",
+    ) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+  return payload.data;
+}
+
+export async function createTicket(
+  requesterId: number,
+  input: {
+    categoryId: number;
+    relatedSystemId: number;
+    summary: string;
+    requestedPriority: RequestedPriority;
+    description: string;
+  },
+): Promise<CreatedTicket> {
+  const response = await fetch(`${API_URL}/api/tickets`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requester-Id": String(requesterId),
+    },
+    body: JSON.stringify(input),
+  });
+  const payload = (await response.json()) as {
+    data?: CreatedTicket;
+    error?: { message?: string; fields?: Record<string, string> };
+  };
+  if (!response.ok || !payload.data) {
+    const error = new Error(
+      payload.error?.message ?? "Ticket could not be created. Please try again.",
+    ) as Error & { fields?: Record<string, string> };
+    error.fields = payload.error?.fields;
+    throw error;
+  }
+  return payload.data;
+}
+
 function isCategory(value: unknown): value is Category {
   return (
     typeof value === "object" &&
     value !== null &&
     typeof (value as Category).id === "number" &&
     typeof (value as Category).name === "string"
+  );
+}
+
+function isRequester(value: unknown): value is DevelopmentRequester {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as DevelopmentRequester).id === "number" &&
+    typeof (value as DevelopmentRequester).displayName === "string" &&
+    typeof (value as DevelopmentRequester).email === "string"
   );
 }
