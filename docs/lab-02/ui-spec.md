@@ -1,6 +1,6 @@
 # Lab 2 UI Specification
 
-Status: Approved contract; implementation and visual verification complete through Issue #17
+Status: Approved contract; implementation, visual verification, and release complete through Issues #10–#18
 
 This document is the visual and interaction contract for Requester Selection, Create Ticket, My Tickets,
 Ticket Detail, and Attachments. It refines FR-01–FR-17 and AC-01–AC-17.
