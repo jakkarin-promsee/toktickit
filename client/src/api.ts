@@ -41,6 +41,23 @@ export interface TicketListItem {
   updatedAt: string;
 }
 
+export interface TicketAttachmentMetadata {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  state: "ACTIVE" | "REMOVED";
+  uploadedByDisplayName: string;
+  createdAt: string;
+  removedAt: string | null;
+  removedByDisplayName: string | null;
+  removalReason: string | null;
+}
+
+export interface TicketDetail extends CreatedTicket {
+  attachments: TicketAttachmentMetadata[];
+}
+
 export interface TicketListQuery {
   search?: string;
   categoryId?: number;
@@ -196,6 +213,29 @@ export async function getMyTickets(
     throw new Error(payload.error?.message ?? "Tickets could not be loaded.");
   }
   return { data: payload.data, pagination: payload.pagination };
+}
+
+export async function getTicketDetail(
+  requesterId: number,
+  ticketId: string,
+): Promise<TicketDetail> {
+  const response = await fetch(`${API_URL}/api/tickets/${ticketId}`, {
+    headers: { "X-Requester-Id": String(requesterId) },
+  });
+  const payload = (await response.json()) as {
+    data?: TicketDetail;
+    error?: { message?: string };
+  };
+  if (!response.ok || !payload.data) {
+    const error = new Error(
+      response.status === 404
+        ? "We couldn't find this ticket."
+        : payload.error?.message ?? "Ticket could not be loaded.",
+    ) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+  return payload.data;
 }
 
 export async function createTicket(

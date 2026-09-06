@@ -267,6 +267,96 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
   }
 });
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+app.get("/api/tickets/:ticketId", async (req: Request, res: Response) => {
+  const requester = await getActiveRequester(req, res);
+  if (!requester) return;
+
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) {
+    sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+    return;
+  }
+
+  try {
+    const ticket = await getPrisma().ticket.findFirst({
+      where: {
+        id: ticketId,
+        requesterId: requester.id,
+      },
+      include: {
+        requester: { select: { id: true, displayName: true } },
+        category: { select: { id: true, name: true } },
+        relatedSystem: { select: { id: true, name: true } },
+        attachments: {
+          include: {
+            uploadedBy: { select: { displayName: true } },
+            removedBy: { select: { displayName: true } },
+          },
+        },
+      },
+    });
+
+    if (!ticket) {
+      sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+      return;
+    }
+
+    const attachments = [...ticket.attachments]
+      .sort((left, right) => {
+        if (left.removedAt === null && right.removedAt !== null) return -1;
+        if (left.removedAt !== null && right.removedAt === null) return 1;
+        if (left.removedAt === null && right.removedAt === null) {
+          return left.createdAt.getTime() - right.createdAt.getTime();
+        }
+        return right.removedAt!.getTime() - left.removedAt!.getTime();
+      })
+      .map((attachment) => ({
+        id: attachment.id,
+        originalName: attachment.originalName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        state: attachment.removedAt ? "REMOVED" : "ACTIVE",
+        uploadedByDisplayName: attachment.uploadedBy.displayName,
+        createdAt: attachment.createdAt,
+        removedAt: attachment.removedAt,
+        removedByDisplayName: attachment.removedBy?.displayName ?? null,
+        removalReason: attachment.removalReason,
+      }));
+
+    res.status(200).json({
+      data: {
+        id: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        ticketDate: ticket.createdAt,
+        requester: ticket.requester,
+        category: ticket.category,
+        relatedSystem: ticket.relatedSystem,
+        summary: ticket.summary,
+        requestedPriority: ticket.requestedPriority,
+        itPriority: ticket.itPriority,
+        currentStatus: ticket.currentStatus,
+        description: ticket.description,
+        createdAt: ticket.createdAt,
+        updatedAt: ticket.updatedAt,
+        attachments,
+      },
+    });
+  } catch (error) {
+    console.error("GET /api/tickets/:ticketId failed:", error);
+    sendError(
+      res,
+      isDependencyError(error) ? 503 : 500,
+      isDependencyError(error) ? "DEPENDENCY_UNAVAILABLE" : "INTERNAL_ERROR",
+      isDependencyError(error)
+        ? "Tickets are temporarily unavailable."
+        : "Ticket could not be loaded. Please try again.",
+    );
+  }
+});
+
 app.get("/api/tickets", async (req: Request, res: Response) => {
   const requester = await getActiveRequester(req, res);
   if (!requester) return;

@@ -9,14 +9,16 @@ import {
   getDevelopmentRequesters,
   getRelatedSystems,
   getMyTickets,
+  getTicketDetail,
   RelatedSystem,
   RequestedPriority,
+  TicketDetail,
   TicketListItem,
   TicketListResponse,
 } from "./api.js";
 
 type RequesterState = "loading" | "ready" | "empty" | "error";
-type Page = "my-tickets" | "create-ticket";
+type Page = "my-tickets" | "create-ticket" | "ticket-detail";
 
 const REQUESTER_STORAGE_KEY = "toktickit.requesterId";
 
@@ -31,11 +33,38 @@ export default function App() {
     useState<DevelopmentRequester | null>(null);
   const [selection, setSelection] = useState("");
   const [requesterError, setRequesterError] = useState("");
-  const [page, setPage] = useState<Page>("my-tickets");
+  const [page, setPage] = useState<Page>(() =>
+    window.location.hash.startsWith("#ticket-") ? "ticket-detail" : "my-tickets",
+  );
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(() =>
+    window.location.hash.startsWith("#ticket-")
+      ? window.location.hash.slice("#ticket-".length)
+      : null,
+  );
   const [diagnosticsState, setDiagnosticsState] =
     useState<"idle" | "loading" | "success" | "error">("idle");
   const [diagnosticCategories, setDiagnosticCategories] = useState<Category[]>([]);
   const [diagnosticError, setDiagnosticError] = useState("");
+
+  useEffect(() => {
+    function handleHashChange() {
+      const ticketHash = window.location.hash.match(/^#ticket-(.+)$/);
+      if (ticketHash) {
+        setSelectedTicketId(ticketHash[1]);
+        setPage("ticket-detail");
+        return;
+      }
+      setSelectedTicketId(null);
+      setPage("my-tickets");
+    }
+
+    window.addEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handleHashChange);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("popstate", handleHashChange);
+    };
+  }, []);
 
   async function loadRequesters() {
     setRequesterState("loading");
@@ -93,7 +122,21 @@ export default function App() {
     localStorage.removeItem(REQUESTER_STORAGE_KEY);
     setSelectedRequester(null);
     setSelection("");
+    setSelectedTicketId(null);
     setPage("my-tickets");
+    window.history.replaceState(null, "", window.location.pathname);
+  }
+
+  function openTicket(ticketId: string) {
+    setSelectedTicketId(ticketId);
+    setPage("ticket-detail");
+    window.history.replaceState(null, "", `#ticket-${ticketId}`);
+  }
+
+  function returnToMyTickets() {
+    setSelectedTicketId(null);
+    setPage("my-tickets");
+    window.history.replaceState(null, "", window.location.pathname);
   }
 
   async function handleCheck() {
@@ -249,8 +292,18 @@ export default function App() {
       <main className="container py-4">
         {page === "create-ticket" ? (
           <CreateTicketPage requester={selectedRequester} onBack={() => setPage("my-tickets")} />
+        ) : page === "ticket-detail" && selectedTicketId ? (
+          <RequesterTicketDetailPage
+            requester={selectedRequester}
+            ticketId={selectedTicketId}
+            onBack={returnToMyTickets}
+          />
         ) : (
-          <MyTicketsPage requester={selectedRequester} onCreate={() => setPage("create-ticket")} />
+          <MyTicketsPage
+            requester={selectedRequester}
+            onCreate={() => setPage("create-ticket")}
+            onOpenTicket={openTicket}
+          />
         )}
       </main>
     </div>
@@ -313,9 +366,11 @@ function getInitialTicketQuery(): TicketQueryState {
 function MyTicketsPage({
   requester,
   onCreate,
+  onOpenTicket,
 }: {
   requester: DevelopmentRequester;
   onCreate: () => void;
+  onOpenTicket: (ticketId: string) => void;
 }) {
   const [query, setQuery] = useState(getInitialTicketQuery);
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
@@ -544,7 +599,7 @@ function MyTicketsPage({
                   <th>Requested Priority</th><th>Status</th><th>Last Updated</th><th>View</th>
                 </tr>
               </thead>
-              <tbody>{tickets.map((ticket) => <TicketRow key={ticket.id} ticket={ticket} />)}</tbody>
+              <tbody>{tickets.map((ticket) => <TicketRow key={ticket.id} ticket={ticket} onOpen={onOpenTicket} />)}</tbody>
             </table>
           </div>
           <div className="d-md-none">
@@ -554,7 +609,15 @@ function MyTicketsPage({
                 <p>{ticket.summary}</p>
                 <p className="mb-1">{ticket.category.name} · {ticket.currentStatus}</p>
                 <p className="mb-2">Updated {formatDate(ticket.updatedAt)}</p>
-                <a href={`#ticket-${ticket.id}`}>View ticket</a>
+                <a
+                  href={`#ticket-${ticket.id}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onOpenTicket(ticket.id);
+                  }}
+                >
+                  View ticket
+                </a>
               </article>
             ))}
           </div>
@@ -617,7 +680,13 @@ function FilterSelect({
   );
 }
 
-function TicketRow({ ticket }: { ticket: TicketListItem }) {
+function TicketRow({
+  ticket,
+  onOpen,
+}: {
+  ticket: TicketListItem;
+  onOpen: (ticketId: string) => void;
+}) {
   return (
     <tr>
       <td>{ticket.ticketNumber}</td>
@@ -626,13 +695,154 @@ function TicketRow({ ticket }: { ticket: TicketListItem }) {
       <td>{ticket.requestedPriority}</td>
       <td>{ticket.currentStatus}</td>
       <td>{formatDate(ticket.updatedAt)}</td>
-      <td><a href={`#ticket-${ticket.id}`}>View ticket</a></td>
+      <td>
+        <a
+          href={`#ticket-${ticket.id}`}
+          onClick={(event) => {
+            event.preventDefault();
+            onOpen(ticket.id);
+          }}
+        >
+          View ticket
+        </a>
+      </td>
     </tr>
   );
 }
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString();
+}
+
+function RequesterTicketDetailPage({
+  requester,
+  ticketId,
+  onBack,
+}: {
+  requester: DevelopmentRequester;
+  ticketId: string;
+  onBack: () => void;
+}) {
+  const [ticket, setTicket] = useState<TicketDetail | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "not-found" | "error">("loading");
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setTicket(null);
+    setState("loading");
+    getTicketDetail(requester.id, ticketId)
+      .then((loaded) => {
+        if (!active) return;
+        setTicket(loaded);
+        setState("ready");
+      })
+      .catch((error: Error & { status?: number }) => {
+        if (!active) return;
+        setState(error.status === 404 ? "not-found" : "error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [requester.id, ticketId, reloadToken]);
+
+  if (state === "loading") {
+    return (
+      <section aria-labelledby="ticket-detail-heading">
+        <h1 id="ticket-detail-heading">Ticket Detail</h1>
+        <p role="status">Loading ticket…</p>
+      </section>
+    );
+  }
+
+  if (state === "not-found") {
+    return (
+      <section aria-labelledby="ticket-detail-heading">
+        <h1 id="ticket-detail-heading">Ticket Detail</h1>
+        <div className="alert alert-warning" role="alert">
+          <p>We couldn't find this ticket.</p>
+        </div>
+        <button className="btn btn-outline-success" onClick={onBack}>Back to My Tickets</button>
+      </section>
+    );
+  }
+
+  if (state === "error" || !ticket) {
+    return (
+      <section aria-labelledby="ticket-detail-heading">
+        <h1 id="ticket-detail-heading">Ticket Detail</h1>
+        <div className="alert alert-danger" role="alert">
+          <p>We couldn't load this ticket. Please try again.</p>
+          <button
+            className="btn btn-outline-danger"
+            onClick={() => setReloadToken((current) => current + 1)}
+          >
+            Retry
+          </button>
+        </div>
+        <button className="btn btn-outline-success" onClick={onBack}>Back to My Tickets</button>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-labelledby="ticket-detail-heading">
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h1 id="ticket-detail-heading">Ticket Detail</h1>
+          <p className="text-body-secondary mb-0">Read-only view for {requester.displayName}</p>
+        </div>
+        <button className="btn btn-link" onClick={onBack}>Back to My Tickets</button>
+      </div>
+      <section className="card p-4 mb-3" aria-labelledby="ticket-information-heading">
+        <h2 id="ticket-information-heading" className="h4">Ticket information</h2>
+        <dl className="row mb-0">
+          <DetailField label="Ticket Number" value={ticket.ticketNumber} />
+          <DetailField label="Ticket Date" value={formatDate(ticket.ticketDate)} />
+          <DetailField label="Requester" value={ticket.requester.displayName} />
+          <DetailField label="Category" value={ticket.category.name} />
+          <DetailField label="Related System" value={ticket.relatedSystem.name} />
+          <DetailField label="Requested Priority" value={ticket.requestedPriority} />
+          <DetailField label="IT Priority" value={ticket.itPriority} />
+          <DetailField label="Current Status" value={ticket.currentStatus} />
+          <DetailField label="Summary" value={ticket.summary} />
+          <DetailField label="Description" value={ticket.description} />
+          <DetailField label="Created" value={formatDate(ticket.createdAt)} />
+          <DetailField label="Last Updated" value={formatDate(ticket.updatedAt)} />
+        </dl>
+      </section>
+      <section className="card p-4" aria-labelledby="attachments-heading">
+        <h2 id="attachments-heading" className="h4">Attachments</h2>
+        {ticket.attachments.length === 0 ? (
+          <p>No attachments are associated with this ticket.</p>
+        ) : (
+          <ul className="list-group">
+            {ticket.attachments.map((attachment) => (
+              <li className="list-group-item" key={attachment.id}>
+                <strong>{attachment.originalName}</strong>
+                <span className="ms-2 badge text-bg-secondary">{attachment.state}</span>
+                <div className="small text-body-secondary">
+                  {attachment.mimeType} · {attachment.sizeBytes} bytes · uploaded by {attachment.uploadedByDisplayName}
+                </div>
+                {attachment.state === "REMOVED" && attachment.removalReason && (
+                  <div className="small text-body-secondary">Removal reason: {attachment.removalReason}</div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </section>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt className="col-sm-4">{label}</dt>
+      <dd className="col-sm-8">{value}</dd>
+    </>
+  );
 }
 
 function CreateTicketPage({
