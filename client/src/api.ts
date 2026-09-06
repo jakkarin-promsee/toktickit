@@ -5,6 +5,29 @@ export interface Category {
   name: string;
 }
 
+export interface RelatedSystem {
+  id: number;
+  name: string;
+}
+
+export type RequestedPriority = "LOW" | "MEDIUM" | "HIGH";
+
+export interface CreatedTicket {
+  id: string;
+  ticketNumber: string;
+  ticketDate: string;
+  requester: { id: number; displayName: string };
+  category: Category;
+  relatedSystem: RelatedSystem;
+  summary: string;
+  requestedPriority: RequestedPriority;
+  itPriority: "UNASSIGNED";
+  currentStatus: "NEW";
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DevelopmentRequester {
   id: number;
   displayName: string;
@@ -92,6 +115,58 @@ export async function getDevelopmentRequesters(): Promise<
   }
 
   return (payload as { data: DevelopmentRequester[] }).data;
+}
+
+async function getReferenceItems(path: string): Promise<Category[]> {
+  const response = await fetch(`${API_URL}${path}`);
+  if (!response.ok) {
+    throw new Error(`Reference data failed with HTTP ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload) || !payload.every(isCategory)) {
+    throw new Error("Reference data returned an unexpected payload");
+  }
+  return payload;
+}
+
+export function getCategories(): Promise<Category[]> {
+  return getReferenceItems("/api/categories");
+}
+
+export function getRelatedSystems(): Promise<RelatedSystem[]> {
+  return getReferenceItems("/api/related-systems");
+}
+
+export async function createTicket(
+  requesterId: number,
+  input: {
+    categoryId: number;
+    relatedSystemId: number;
+    summary: string;
+    requestedPriority: RequestedPriority;
+    description: string;
+  },
+): Promise<CreatedTicket> {
+  const response = await fetch(`${API_URL}/api/tickets`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requester-Id": String(requesterId),
+    },
+    body: JSON.stringify(input),
+  });
+  const payload = (await response.json()) as {
+    data?: CreatedTicket;
+    error?: { message?: string; fields?: Record<string, string> };
+  };
+  if (!response.ok || !payload.data) {
+    const error = new Error(
+      payload.error?.message ?? "Ticket could not be created. Please try again.",
+    ) as Error & { fields?: Record<string, string> };
+    error.fields = payload.error?.fields;
+    throw error;
+  }
+  return payload.data;
 }
 
 function isCategory(value: unknown): value is Category {
