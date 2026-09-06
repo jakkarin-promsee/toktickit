@@ -30,7 +30,7 @@ must create both owners explicitly. Binary fixtures include exact 5 MB and 5 MB 
 | UNIT-02 | Unit | BR-09–BR-13 / AC-06 | Trimming, required values, 5/120 Summary and 10/2000 Description boundaries | Valid boundaries pass; outside values get field errors | `server/tests/lab-02/ticket-validation.test.ts` | Planned #13 |
 | UNIT-03 | Unit | BR-18–BR-21 / AC-08 | Query defaults, allowlists, normalization, stable secondary sort | Valid query object or safe invalid-query result | `server/tests/lab-02/ticket-query.test.ts` | Planned #14 |
 | UNIT-04 | Unit | BR-23–BR-26 / AC-12, AC-13 | Extension/MIME/signature, exact 5 MB boundary, safe storage name | Only permitted coherent files pass; UUID name generated | `server/tests/lab-02/attachment-validation.test.ts` | Planned #16 |
-| API-01 | API | FR-01 / AC-01 | Active Requester collection, sort, empty and database failure | `200` active-only/empty; safe `503` | `server/tests/lab-02/requesters.api.test.ts` | Planned #12 |
+| API-01 | API | FR-01 / AC-01 | Active Requester collection, sort, empty and database failure | `200` active-only/empty; safe `503` | `server/tests/lab-02/requesters.api.test.ts` | Pass #12 |
 | API-02 | API | FR-05 / AC-05 | Valid creation and backend-controlled owner/defaults/number | `201`; exactly one owned NEW Ticket | `server/tests/lab-02/create-ticket.api.test.ts` | Planned #13 |
 | API-03 | API | FR-05 / AC-06 | Invalid fields, boundaries, inactive references/context, protected fields | `400/422`; no Ticket saved | `server/tests/lab-02/create-ticket.api.test.ts` | Planned #13 |
 | API-04 | API | FR-08 / AC-08 | Ownership, search, each filter, combined filters, sort, pagination | Only owned matches with stable order/metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Planned #14 |
@@ -40,8 +40,8 @@ must create both owners explicitly. Binary fixtures include exact 5 MB and 5 MB 
 | API-08 | API | BR-23–BR-26 / AC-13 | Unsupported, mismatched, 5 MB + 1, sixth, concurrent final-slot uploads, other owner, storage failure | Safe `404/413/415/422/503`; exactly one final-slot upload; no orphan | `server/tests/lab-02/attachments.api.test.ts` | Planned #16 |
 | API-09 | API | FR-15–FR-16 / AC-15, AC-16 | Valid removal, invalid reason, duplicate removal, removed download | Metadata retained; `422/409/410` as contracted | `server/tests/lab-02/attachments.api.test.ts` | Planned #16 |
 | API-10 | API | BR-04, FR-18 / AC-11, AC-16 | Missing/malformed/inactive Requester context on every scoped endpoint family and cross-owner response equivalence | `400` invalid context; no existence, metadata, path, or bytes leak | `server/tests/lab-02/ownership.api.test.ts` | Planned #16 |
-| UI-01 | UI | FR-01 / AC-01, AC-02 | Selector loading, ready, disabled Continue, empty, failure, testing copy | Correct state and accessible controls | `client/tests/lab-02/RequesterSelection.test.tsx` | Planned #12 |
-| UI-02 | UI | FR-02–FR-03 / AC-03 | Persist selection, shell identity, dirty-form switch confirmation, cache/draft clearing | Cancel preserves context; confirm shows new identity with no stale data | `client/tests/lab-02/RequesterContext.test.tsx` | Planned #12 |
+| UI-01 | UI | FR-01 / AC-01, AC-02 | Selector loading, ready, disabled Continue, empty, failure, testing copy | Correct state and accessible controls | `client/tests/lab-02/RequesterSelection.test.tsx` | Pass #12 |
+| UI-02 | UI | FR-02–FR-03 / AC-03 | Persist selection, shell identity, and requester-context cache/draft clearing | New identity is shown and requester-specific state does not remain; dirty-form confirmation is exercised when ticket forms exist | `client/tests/lab-02/RequesterSelection.test.tsx` | Pass #12 (current scope) |
 | UI-03 | UI | FR-06 / AC-04 | All Create fields, required/read-only semantics, reference loading | Contracted labels and states render | `client/tests/lab-02/CreateTicket.test.tsx` | Planned #13 |
 | UI-04 | UI | FR-07 / AC-06, AC-07 | Client validation, first-invalid focus, dirty Clear confirmation, busy duplicate prevention, failure retention | Cancel preserves values; no invalid API call; one pending call; values retained | `client/tests/lab-02/CreateTicket.test.tsx` | Planned #13 |
 | UI-05 | UI | FR-05 / AC-05 | Successful create response and next actions | Official backend number shown; form resets at defined time | `client/tests/lab-02/CreateTicket.test.tsx` | Planned #13 |
@@ -129,8 +129,8 @@ database. E2E requires server/client processes plus a clean temporary Attachment
 | --- | --- | --- |
 | Engineering contract (`DOC-01`) | Pass in Issue #10 | `npm test -- --run tests/lab-02/engineering-contract.test.ts` |
 | Lab 1 regression | To run before Issue #10 handoff | Attach command output to PR |
-| Lab 2 unit/API | Issue #11 foundation tests pass; Issues #12–#16 pending | `UNIT-01` and `DB-01` pass in the full server suite |
-| Lab 2 UI/style | Planned for Issues #12–#17 | Update after implementation |
+| Lab 2 unit/API | Issue #11 foundation and Issue #12 Requester API tests pass; Issues #13–#16 pending | `UNIT-01`, `DB-01`, and `API-01` pass in the full server suite |
+| Lab 2 UI/style | Issue #12 selector/context and Lab 1 regression pass; Issues #13–#17 pending | `UI-01`, `UI-02`, and existing Lab 1 UI tests pass |
 | Lab 2 responsive/E2E | Planned for Issue #17 | Update after implementation |
 
 The Issue #10 PR may claim only that the contract and its structural test pass. Product completion remains
