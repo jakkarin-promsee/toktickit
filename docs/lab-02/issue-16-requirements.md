@@ -1,5 +1,7 @@
 # Issue #16 Requirements: Attachment Lifecycle
 
+Status: Implemented, merged, and verified in the final Issue #17 integration suite
+
 ## Goal
 
 Implement the complete requester-owned attachment lifecycle for Lab 2: upload permitted files, list safe metadata, download active files, and soft-remove files with a reason.

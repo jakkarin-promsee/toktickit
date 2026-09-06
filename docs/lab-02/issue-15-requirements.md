@@ -1,5 +1,7 @@
 # Issue #15 — Requester-owned Ticket Detail Requirements
 
+Status: Implemented, merged, and verified in the final Issue #17 integration suite
+
 ## Goal
 
 Allow the selected Development Requester to open one of their own Tickets from My Tickets and inspect its complete read-only information without exposing tickets owned by another Requester.

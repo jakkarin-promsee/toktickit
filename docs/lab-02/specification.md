@@ -1,6 +1,6 @@
 # Lab 2 Sprint Engineering Specification
 
-Status: Draft for peer review
+Status: Approved contract; product implementation verified locally through Issue #17
 Issue: #10
 Branch: `feature/10-lab2-engineering-contract`
 
@@ -220,18 +220,18 @@ stable `{ error: { code, message, fields? } }` shape.
 
 ## 10. Definition of Done
 
-- [ ] Issues #10–#17 implement all approved FR, BR, and AC without excluded functionality.
-- [ ] The four contract documents are internally consistent, peer-reviewed, and Issue #10 is merged before
+- [x] Issues #10–#17 implement all approved FR, BR, and AC without excluded functionality.
+- [x] The four contract documents are internally consistent, peer-reviewed, and Issue #10 is merged before
       production implementation starts.
-- [ ] Prisma migration applies to a clean database; seed is repeatable and contains all required data.
-- [ ] Frontend and backend validation, ownership behavior, errors, and attachment boundaries match this
+- [x] Prisma migration applies to a clean database; seed is repeatable and contains all required data.
+- [x] Frontend and backend validation, ownership behavior, errors, and attachment boundaries match this
       contract.
-- [ ] Every AC maps to automated or explicit visual evidence in `tests.md`; no required test is skipped,
+- [x] Every AC maps to automated or explicit visual evidence in `tests.md`; no required test is skipped,
       disabled, commented out, flaky, or unrelated.
-- [ ] Unit, API/integration, UI component, style, responsive, and E2E suites pass using documented commands.
-- [ ] Desktop, tablet, and mobile screenshots and the visual checklist show no clipping, overlap, hidden
+- [x] Unit, API/integration, UI component, style, responsive, and E2E suites pass using documented commands.
+- [x] Desktop, tablet, and mobile screenshots and the visual checklist show no clipping, overlap, hidden
       actions, or horizontal overflow.
-- [ ] Setup, migration, seed, run, test, storage, and cleanup instructions are current in README.
+- [x] Setup, migration, seed, run, test, storage, and cleanup instructions are current in README.
 - [ ] A peer approves each feature PR into `lab2-staging`; review comments are resolved and recorded.
 - [ ] The release PR from `lab2-staging` to `main` passes final tests and contains required course evidence.
 

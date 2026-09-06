@@ -1,5 +1,7 @@
 # Lab 2 REST API Specification
 
+Status: Approved and verified through Issue #17
+
 Base URL: `/api`
 Media type: `application/json` except multipart upload and binary download
 Dates: UTC ISO 8601 strings
@@ -316,5 +318,5 @@ number was shown.
 | Attachment download | `200` | `404` | `410` |
 | Attachment removal | `200` | `404` | `409` |
 
-Unexpected exceptions are logged server-side with a correlation ID, while clients receive
-`500 INTERNAL_ERROR` and a generic retry message. Database or storage outages use `503` when identified.
+Unexpected exceptions are logged server-side, while clients receive `500 INTERNAL_ERROR` and a generic
+retry message. Database or storage outages use `503` when identified.
