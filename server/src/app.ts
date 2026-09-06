@@ -9,6 +9,26 @@ export const app = express();
 app.use(cors());          // lets the Vite dev server on :5173 call this API
 app.use(express.json());
 
+app.get("/api/requesters", async (_req: Request, res: Response) => {
+  try {
+    const requesters = await getPrisma().requesterUser.findMany({
+      where: { isActive: true },
+      orderBy: [{ displayName: "asc" }, { id: "asc" }],
+      select: { id: true, displayName: true, email: true },
+    });
+
+    res.status(200).json({ data: requesters });
+  } catch (error) {
+    console.error("GET /api/requesters failed:", error);
+    res.status(503).json({
+      error: {
+        code: "DEPENDENCY_UNAVAILABLE",
+        message: "Development Requesters are temporarily unavailable.",
+      },
+    });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Issue 2 — API health check
 // Liveness probe: answers "is this process up and serving HTTP?".

@@ -5,6 +5,12 @@ export interface Category {
   name: string;
 }
 
+export interface DevelopmentRequester {
+  id: number;
+  displayName: string;
+  email: string;
+}
+
 export interface SystemStatus {
   online: boolean;
   categories: Category[];
@@ -66,11 +72,43 @@ export async function checkSystem(): Promise<SystemStatus> {
   return { online: true, categories: payload as Category[] };
 }
 
+export async function getDevelopmentRequesters(): Promise<
+  DevelopmentRequester[]
+> {
+  const response = await fetch(`${API_URL}/api/requesters`);
+
+  if (!response.ok) {
+    throw new Error(`Requester list failed with HTTP ${response.status}`);
+  }
+
+  const payload: unknown = await response.json();
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !Array.isArray((payload as { data?: unknown }).data) ||
+    !(payload as { data: unknown[] }).data.every(isRequester)
+  ) {
+    throw new Error("Requester list returned an unexpected payload");
+  }
+
+  return (payload as { data: DevelopmentRequester[] }).data;
+}
+
 function isCategory(value: unknown): value is Category {
   return (
     typeof value === "object" &&
     value !== null &&
     typeof (value as Category).id === "number" &&
     typeof (value as Category).name === "string"
+  );
+}
+
+function isRequester(value: unknown): value is DevelopmentRequester {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as DevelopmentRequester).id === "number" &&
+    typeof (value as DevelopmentRequester).displayName === "string" &&
+    typeof (value as DevelopmentRequester).email === "string"
   );
 }
