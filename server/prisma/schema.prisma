@@ -11,15 +11,104 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ---------------------------------------------------------------------------
-// Issue 3 — Create and seed IT request categories
-// A supported request type a ticket can be filed under. The four rows are
-// reference data owned by the seed (prisma/seed.ts), not user input.
-// @unique on `name` is what makes re-running the seed safe: it is the lookup
-// key for upsert, and the database itself rejects a duplicate name.
-// ---------------------------------------------------------------------------
+enum RequestedPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ItPriority {
+  UNASSIGNED
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TicketStatus {
+  NEW
+}
+
+model RequesterUser {
+  id                  Int          @id @default(autoincrement())
+  email               String       @unique
+  displayName         String
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @default(now()) @updatedAt
+  tickets             Ticket[]
+  uploadedAttachments Attachment[] @relation("AttachmentUploader")
+  removedAttachments  Attachment[] @relation("AttachmentRemover")
+
+  @@index([isActive, displayName, id])
+}
+
 model Category {
   id        Int      @id @default(autoincrement())
   name      String   @unique
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  tickets   Ticket[]
+
+  @@index([isActive, name])
+}
+
+model RelatedSystem {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  tickets   Ticket[]
+
+  @@index([isActive, name])
+}
+
+model Ticket {
+  id                String            @id @default(uuid()) @db.Uuid
+  ticketNumber      String            @unique @db.VarChar(19)
+  requesterId       Int
+  categoryId        Int
+  relatedSystemId   Int
+  summary           String            @db.VarChar(120)
+  description       String            @db.VarChar(2000)
+  requestedPriority RequestedPriority
+  itPriority        ItPriority        @default(UNASSIGNED)
+  currentStatus     TicketStatus      @default(NEW)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @default(now()) @updatedAt
+  requester         RequesterUser     @relation(fields: [requesterId], references: [id], onDelete: Restrict)
+  category          Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystem     RelatedSystem     @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+  attachments       Attachment[]
+
+  @@index([requesterId, updatedAt, id])
+  @@index([requesterId, createdAt, id])
+  @@index([requesterId, categoryId])
+  @@index([requesterId, relatedSystemId])
+  @@index([requesterId, currentStatus])
+  @@index([requesterId, requestedPriority])
+  @@index([requesterId, ticketNumber])
+}
+
+model Attachment {
+  id                    String         @id @default(uuid()) @db.Uuid
+  ticketId              String         @db.Uuid
+  originalName          String         @db.VarChar(255)
+  storageName           String         @unique @db.VarChar(255)
+  mimeType              String         @db.VarChar(100)
+  sizeBytes             Int
+  sha256                String         @db.Char(64)
+  uploadedByRequesterId Int
+  createdAt             DateTime       @default(now())
+  removedAt             DateTime?
+  removedByRequesterId  Int?
+  removalReason         String?        @db.VarChar(250)
+  ticket                Ticket         @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  uploadedBy            RequesterUser  @relation("AttachmentUploader", fields: [uploadedByRequesterId], references: [id], onDelete: Restrict)
+  removedBy             RequesterUser? @relation("AttachmentRemover", fields: [removedByRequesterId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, removedAt])
+  @@index([uploadedByRequesterId])
+  @@index([removedByRequesterId])
 }

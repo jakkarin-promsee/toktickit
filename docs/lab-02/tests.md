@@ -25,7 +25,8 @@ must create both owners explicitly. Binary fixtures include exact 5 MB and 5 MB 
 | Test ID | Type | Requirement / AC | What it tests | Expected result | Automated file | Final status |
 | --- | --- | --- | --- | --- | --- | --- |
 | DOC-01 | Unit | Issue #10 | Required docs, sections, IDs, endpoints, fixed rules, AC mappings | Contract remains complete and internally linked | `server/tests/lab-02/engineering-contract.test.ts` | Pass |
-| UNIT-01 | Unit | BR-01 / AC-05 | Ticket Number format and collision retry at date/sequence boundaries | Unique `TKT-YYYYMMDD-NNNNNN` values | `server/tests/lab-02/ticket-number.test.ts` | Planned #11 |
+| UNIT-01 | Unit | BR-01 / AC-05 | Ticket Number format and collision retry at date/sequence boundaries | Unique `TKT-YYYYMMDD-NNNNNN` values | `server/tests/lab-02/ticket-number.test.ts` | Pass #11 |
+| DB-01 | Unit / schema | Data design / DoD | Prisma models, enums, relationships, indexes, migration SQL, required seed records, and repeatable upserts | Contracted schema and duplicate-safe seed foundation | `server/tests/lab-02/data-foundation.test.ts` | Pass #11 |
 | UNIT-02 | Unit | BR-09–BR-13 / AC-06 | Trimming, required values, 5/120 Summary and 10/2000 Description boundaries | Valid boundaries pass; outside values get field errors | `server/tests/lab-02/ticket-validation.test.ts` | Planned #13 |
 | UNIT-03 | Unit | BR-18–BR-21 / AC-08 | Query defaults, allowlists, normalization, stable secondary sort | Valid query object or safe invalid-query result | `server/tests/lab-02/ticket-query.test.ts` | Planned #14 |
 | UNIT-04 | Unit | BR-23–BR-26 / AC-12, AC-13 | Extension/MIME/signature, exact 5 MB boundary, safe storage name | Only permitted coherent files pass; UUID name generated | `server/tests/lab-02/attachment-validation.test.ts` | Planned #16 |
@@ -128,7 +129,7 @@ database. E2E requires server/client processes plus a clean temporary Attachment
 | --- | --- | --- |
 | Engineering contract (`DOC-01`) | Pass in Issue #10 | `npm test -- --run tests/lab-02/engineering-contract.test.ts` |
 | Lab 1 regression | To run before Issue #10 handoff | Attach command output to PR |
-| Lab 2 unit/API | Planned for Issues #11–#16 | Update after implementation |
+| Lab 2 unit/API | Issue #11 foundation tests pass; Issues #12–#16 pending | `UNIT-01` and `DB-01` pass in the full server suite |
 | Lab 2 UI/style | Planned for Issues #12–#17 | Update after implementation |
 | Lab 2 responsive/E2E | Planned for Issue #17 | Update after implementation |
 
