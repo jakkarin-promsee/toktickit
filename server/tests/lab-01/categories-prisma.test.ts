@@ -36,6 +36,7 @@ describe("GET /api/categories — query contract", () => {
     // ORDER BY, so dropping `orderBy` would slip past a response-only check.
     // The same goes for `select` — this fails the moment either is removed.
     expect(findMany).toHaveBeenCalledWith({
+      where: { isActive: true },
       orderBy: { id: "asc" },
       select: { id: true, name: true },
     });
