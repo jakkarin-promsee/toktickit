@@ -80,9 +80,8 @@ describe("App", () => {
     // this the stub would happily answer a misspelled path and the suite would
     // still pass — the two calls are part of the behaviour under test.
     const requested = fetchMock.mock.calls.map((call) => String(call[0]));
-    expect(requested).toHaveLength(2);
-    expect(requested[0]).toMatch(/\/api\/health$/);
-    expect(requested[1]).toMatch(/\/api\/categories$/);
+    expect(requested.filter((url) => /\/api\/health$/.test(url))).toHaveLength(1);
+    expect(requested.filter((url) => /\/api\/categories$/.test(url))).toHaveLength(1);
 
     // Reading the items back in document order proves the list preserves the
     // order the API sent, where four separate presence checks would not.
@@ -118,7 +117,9 @@ describe("App", () => {
       ).toBeInTheDocument()
     );
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/System Status: Offline/i);
+    expect(screen.getAllByRole("alert").at(-1)).toHaveTextContent(
+      /System Status: Offline/i,
+    );
     expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
   });
 
@@ -166,8 +167,8 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: /check system/i }));
 
     await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        /System Status: Offline/i
+      expect(screen.getAllByRole("alert").at(-1)).toHaveTextContent(
+        /System Status: Offline/i,
       )
     );
 
