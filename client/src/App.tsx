@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   Category,
   checkSystem,
@@ -26,6 +26,8 @@ type Page = "my-tickets" | "create-ticket" | "ticket-detail";
 
 const REQUESTER_STORAGE_KEY = "toktickit.requesterId";
 
+document.documentElement.dataset.theme = "zen-green";
+
 function countCharacters(value: string) {
   return Array.from(value).length;
 }
@@ -49,6 +51,7 @@ export default function App() {
     useState<"idle" | "loading" | "success" | "error">("idle");
   const [diagnosticCategories, setDiagnosticCategories] = useState<Category[]>([]);
   const [diagnosticError, setDiagnosticError] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     function handleHashChange() {
@@ -119,6 +122,7 @@ export default function App() {
     localStorage.setItem(REQUESTER_STORAGE_KEY, String(requester.id));
     setSelectedRequester(requester);
     setPage("my-tickets");
+    setMenuOpen(false);
   }
 
   function changeRequester() {
@@ -128,6 +132,7 @@ export default function App() {
     setSelection("");
     setSelectedTicketId(null);
     setPage("my-tickets");
+    setMenuOpen(false);
     window.history.replaceState(null, "", window.location.pathname);
   }
 
@@ -161,7 +166,7 @@ export default function App() {
     return (
       <main className="container py-5" style={{ maxWidth: 640 }}>
         <h1 className="h3 mb-4">TokTickIT</h1>
-        <section className="card shadow-sm p-4" aria-labelledby="requester-heading">
+        <section className="card zen-card shadow-sm p-4" aria-labelledby="requester-heading">
           <h2 id="requester-heading" className="h4">
             Select a Development Requester
           </h2>
@@ -260,38 +265,51 @@ export default function App() {
 
   return (
     <div className="min-vh-100 bg-light">
-      <header className="navbar navbar-dark bg-success px-3" role="banner">
+      <header className="app-header navbar navbar-dark px-3" role="banner">
         <span className="navbar-brand">TokTickIT</span>
-        <span className="text-white">
+        <span className="requester-identity text-white">
           Development Requester: <strong>{selectedRequester.displayName}</strong>
         </span>
         <button className="btn btn-outline-light ms-auto" onClick={changeRequester}>
           Change Requester
         </button>
       </header>
-      <nav className="navbar navbar-expand bg-white border-bottom px-3" aria-label="Main navigation">
-        <a
-          className={`nav-link ${page === "my-tickets" ? "active" : ""}`}
-          aria-current={page === "my-tickets" ? "page" : undefined}
-          href="#my-tickets"
-          onClick={(event) => {
-            event.preventDefault();
-            setPage("my-tickets");
-          }}
+      <nav className="app-navigation navbar px-3" aria-label="Main navigation">
+        <button
+          className="app-menu-toggle btn btn-outline-success"
+          type="button"
+          aria-expanded={menuOpen}
+          aria-controls="main-navigation-links"
+          onClick={() => setMenuOpen((current) => !current)}
         >
-          My Tickets
-        </a>
-        <a
-          className={`nav-link ${page === "create-ticket" ? "active" : ""}`}
-          aria-current={page === "create-ticket" ? "page" : undefined}
-          href="#create-ticket"
-          onClick={(event) => {
-            event.preventDefault();
-            setPage("create-ticket");
-          }}
-        >
-          Create Ticket
-        </a>
+          {menuOpen ? "Close menu" : "Open menu"}
+        </button>
+        <div id="main-navigation-links" className={`nav-links ${menuOpen ? "is-open" : ""}`}>
+          <a
+            className={`nav-link ${page === "my-tickets" ? "active" : ""}`}
+            aria-current={page === "my-tickets" ? "page" : undefined}
+            href="#my-tickets"
+            onClick={(event) => {
+              event.preventDefault();
+              setPage("my-tickets");
+              setMenuOpen(false);
+            }}
+          >
+            My Tickets
+          </a>
+          <a
+            className={`nav-link ${page === "create-ticket" ? "active" : ""}`}
+            aria-current={page === "create-ticket" ? "page" : undefined}
+            href="#create-ticket"
+            onClick={(event) => {
+              event.preventDefault();
+              setPage("create-ticket");
+              setMenuOpen(false);
+            }}
+          >
+            Create Ticket
+          </a>
+        </div>
       </nav>
       <main className="container py-4">
         {page === "create-ticket" ? (
@@ -483,7 +501,7 @@ function MyTicketsPage({
         <h1 id="my-tickets-heading">My Tickets</h1>
         <button className="btn btn-success" onClick={onCreate}>Create Ticket</button>
       </div>
-      <section className="card p-3 mb-3" aria-label="Ticket search and filters">
+      <section className="card zen-card p-3 mb-3" aria-label="Ticket search and filters">
         <div className="row g-2">
           <div className="col-12">
             <label className="form-label" htmlFor="ticket-search">Search</label>
@@ -608,10 +626,16 @@ function MyTicketsPage({
           </div>
           <div className="d-md-none">
             {tickets.map((ticket) => (
-              <article className="card p-3 mb-2" key={ticket.id}>
+              <article className="card zen-card p-3 mb-2" key={ticket.id}>
                 <h2 className="h5">{ticket.ticketNumber}</h2>
                 <p>{ticket.summary}</p>
-                <p className="mb-1">{ticket.category.name} · {ticket.currentStatus}</p>
+                <p className="mb-1">{ticket.category.name}</p>
+                <p className="mb-1">
+                  Requested Priority: <span className="badge badge-priority">{ticket.requestedPriority}</span>
+                </p>
+                <p className="mb-1">
+                  Status: <span className="badge badge-zen">{ticket.currentStatus}</span>
+                </p>
                 <p className="mb-2">Updated {formatDate(ticket.updatedAt)}</p>
                 <a
                   href={`#ticket-${ticket.id}`}
@@ -696,8 +720,8 @@ function TicketRow({
       <td>{ticket.ticketNumber}</td>
       <td>{ticket.summary}</td>
       <td>{ticket.category.name}</td>
-      <td>{ticket.requestedPriority}</td>
-      <td>{ticket.currentStatus}</td>
+      <td><span className="badge badge-priority">{ticket.requestedPriority}</span></td>
+      <td><span className="badge badge-zen">{ticket.currentStatus}</span></td>
       <td>{formatDate(ticket.updatedAt)}</td>
       <td>
         <a
@@ -798,7 +822,7 @@ function RequesterTicketDetailPage({
         </div>
         <button className="btn btn-link" onClick={onBack}>Back to My Tickets</button>
       </div>
-      <section className="card p-4 mb-3" aria-labelledby="ticket-information-heading">
+      <section className="card zen-card p-4 mb-3" aria-labelledby="ticket-information-heading">
         <h2 id="ticket-information-heading" className="h4">Ticket information</h2>
         <dl className="row mb-0">
           <DetailField label="Ticket Number" value={ticket.ticketNumber} />
@@ -806,16 +830,16 @@ function RequesterTicketDetailPage({
           <DetailField label="Requester" value={ticket.requester.displayName} />
           <DetailField label="Category" value={ticket.category.name} />
           <DetailField label="Related System" value={ticket.relatedSystem.name} />
-          <DetailField label="Requested Priority" value={ticket.requestedPriority} />
-          <DetailField label="IT Priority" value={ticket.itPriority} />
-          <DetailField label="Current Status" value={ticket.currentStatus} />
+          <DetailBadgeField label="Requested Priority" value={ticket.requestedPriority} className="badge-priority" />
+          <DetailBadgeField label="IT Priority" value={ticket.itPriority} className="badge-muted" />
+          <DetailBadgeField label="Current Status" value={ticket.currentStatus} className="badge-zen" />
           <DetailField label="Summary" value={ticket.summary} />
           <DetailField label="Description" value={ticket.description} />
           <DetailField label="Created" value={formatDate(ticket.createdAt)} />
           <DetailField label="Last Updated" value={formatDate(ticket.updatedAt)} />
         </dl>
       </section>
-      <section className="card p-4" aria-labelledby="attachments-heading">
+      <section className="card zen-card p-4" aria-labelledby="attachments-heading">
         <h2 id="attachments-heading" className="h4">Attachments</h2>
         <AttachmentSection
           requesterId={requester.id}
@@ -836,6 +860,23 @@ function DetailField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function DetailBadgeField({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className: string;
+}) {
+  return (
+    <>
+      <dt className="col-sm-4">{label}</dt>
+      <dd className="col-sm-8"><span className={`badge ${className}`}>{value}</span></dd>
+    </>
+  );
+}
+
 function AttachmentSection({
   requesterId,
   ticketId,
@@ -852,6 +893,49 @@ function AttachmentSection({
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removalReason, setRemovalReason] = useState("");
   const [removalError, setRemovalError] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const lastRemoveButtonRef = useRef<HTMLButtonElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  function closeRemovalDialog() {
+    setRemovingId(null);
+    setRemovalReason("");
+    setRemovalError("");
+    lastRemoveButtonRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!removingId) return;
+    cancelButtonRef.current?.focus();
+
+    function handleDialogKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeRemovalDialog();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), textarea:not([disabled])",
+        ),
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => document.removeEventListener("keydown", handleDialogKeyDown);
+  }, [removingId]);
 
   function validateLocalFile(file: File) {
     const allowed = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
@@ -907,16 +991,21 @@ function AttachmentSection({
       setRemovingId(null);
       setRemovalReason("");
       setRemovalError("");
+      requestAnimationFrame(() => uploadInputRef.current?.focus());
     } catch (error) {
       setRemovalError(error instanceof Error ? error.message : "Attachment could not be removed.");
     }
   }
+
+  const activeAttachments = attachments.filter((attachment) => attachment.state === "ACTIVE");
+  const removedAttachments = attachments.filter((attachment) => attachment.state === "REMOVED");
 
   return (
     <>
       <p className="text-body-secondary">JPG/JPEG, PNG, WEBP, or PDF up to 5 MB each; five active files maximum.</p>
       <label className="form-label" htmlFor="attachment-file">Add attachment</label>
       <input
+        ref={uploadInputRef}
         id="attachment-file"
         className="form-control"
         type="file"
@@ -930,51 +1019,111 @@ function AttachmentSection({
       {attachments.length === 0 ? (
         <p className="mt-3">No attachments are associated with this ticket.</p>
       ) : (
-        <ul className="list-group mt-3">
-          {attachments.map((attachment) => (
-            <li className="list-group-item" key={attachment.id}>
-              <div className="d-flex flex-wrap gap-2 align-items-center">
-                <strong>{attachment.originalName}</strong>
-                <span className="badge text-bg-secondary">{attachment.state}</span>
-                {attachment.state === "ACTIVE" ? (
-                  <>
+        <>
+          {activeAttachments.length > 0 && (
+            <ul className="list-group mt-3" aria-label="Active attachments">
+              {activeAttachments.map((attachment) => (
+                <li className="list-group-item" key={attachment.id}>
+                  <div className="d-flex flex-wrap gap-2 align-items-center">
+                    <strong>{attachment.originalName}</strong>
+                    <span className="badge text-bg-secondary">ACTIVE</span>
                     <button className="btn btn-sm btn-outline-success" onClick={() => void handleDownload(attachment)}>
                       Download
                     </button>
-                    <button className="btn btn-sm btn-outline-danger" onClick={() => setRemovingId(attachment.id)}>
+                    <button
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={(event) => {
+                        lastRemoveButtonRef.current = event.currentTarget;
+                        setRemovingId(attachment.id);
+                      }}
+                    >
                       Remove
                     </button>
-                  </>
-                ) : (
-                  <span className="text-body-secondary">Unavailable for download</span>
-                )}
-              </div>
-              <div className="small text-body-secondary">
-                {attachment.mimeType} · {attachment.sizeBytes} bytes · uploaded by {attachment.uploadedByDisplayName}
-              </div>
-              {attachment.state === "REMOVED" && attachment.removalReason && (
-                <div className="small text-body-secondary">Removal reason: {attachment.removalReason}</div>
-              )}
-            </li>
-          ))}
-        </ul>
+                  </div>
+                  <div className="small text-body-secondary">
+                    {attachment.mimeType} · {attachment.sizeBytes} bytes · uploaded by {attachment.uploadedByDisplayName}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {removedAttachments.length > 0 && (
+            <details className="mt-3" open>
+              <summary>Removed attachments ({removedAttachments.length})</summary>
+              <ul className="list-group mt-2">
+                {removedAttachments.map((attachment) => (
+                  <li className="list-group-item" key={attachment.id}>
+                    <div className="d-flex flex-wrap gap-2 align-items-center">
+                      <strong>{attachment.originalName}</strong>
+                      <span className="badge text-bg-secondary">REMOVED</span>
+                      <span className="text-body-secondary">Unavailable for download</span>
+                    </div>
+                    <div className="small text-body-secondary">
+                      {attachment.mimeType} · {attachment.sizeBytes} bytes · uploaded by {attachment.uploadedByDisplayName}
+                    </div>
+                    <div className="small text-body-secondary">
+                      Removed {attachment.removedAt ? formatDate(attachment.removedAt) : "on an unknown date"}
+                      {attachment.removedByDisplayName ? ` by ${attachment.removedByDisplayName}` : ""}
+                      {attachment.removalReason ? ` · Reason: ${attachment.removalReason}` : ""}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
       )}
       {removingId && (
-        <div className="modal d-block" role="dialog" aria-modal="true" aria-labelledby="removal-heading">
+        <div
+          ref={dialogRef}
+          className="modal d-block"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="removal-heading"
+          aria-describedby="removal-description"
+        >
           <div className="modal-dialog">
             <div className="modal-content p-3">
               <h3 id="removal-heading" className="h5">Remove attachment?</h3>
+              <p id="removal-description">
+                Remove {attachments.find((item) => item.id === removingId)?.originalName}.
+                Its bytes will no longer be available for download.
+              </p>
               <label className="form-label" htmlFor="removal-reason">Removal reason</label>
               <textarea
                 id="removal-reason"
                 className="form-control"
                 value={removalReason}
-                onChange={(event) => setRemovalReason(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setRemovalReason(value);
+                  const length = Array.from(value.trim()).length;
+                  setRemovalError(
+                    length > 0 && (length < 10 || length > 250)
+                      ? "Removal reason must contain 10–250 characters."
+                      : "",
+                  );
+                }}
               />
               {removalError && <div className="text-danger" role="alert">{removalError}</div>}
               <div className="mt-3 d-flex gap-2">
-                <button className="btn btn-danger" onClick={() => void confirmRemoval()}>Confirm removal</button>
-                <button className="btn btn-outline-secondary" onClick={() => setRemovingId(null)}>Cancel</button>
+                <button
+                  className="btn btn-danger"
+                  onClick={() => void confirmRemoval()}
+                  disabled={
+                    Array.from(removalReason.trim()).length < 10 ||
+                    Array.from(removalReason.trim()).length > 250
+                  }
+                >
+                  Confirm removal
+                </button>
+                <button
+                  ref={cancelButtonRef}
+                  className="btn btn-outline-secondary"
+                  onClick={closeRemovalDialog}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
@@ -1058,7 +1207,18 @@ function CreateTicketPage({
     const nextErrors = validate();
     setErrors(nextErrors);
     setSubmitError("");
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      const firstInvalidId: Record<string, string> = {
+        categoryId: "category",
+        relatedSystemId: "related-system",
+        summary: "ticket-summary",
+        requestedPriority: "requested-priority",
+        description: "description",
+      };
+      const firstInvalidField = Object.keys(nextErrors)[0];
+      requestAnimationFrame(() => document.getElementById(firstInvalidId[firstInvalidField])?.focus());
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -1171,7 +1331,7 @@ function CreateTicketPage({
       {referenceError && <div className="alert alert-danger" role="alert">{referenceError}</div>}
       {submitError && <div className="alert alert-danger" role="alert">{submitError}</div>}
       <form onSubmit={(event) => void submit(event)} noValidate>
-        <section className="card p-4 mb-3" aria-labelledby="ticket-information-heading">
+        <section className="card zen-card p-4 mb-3" aria-labelledby="ticket-information-heading">
           <h2 id="ticket-information-heading" className="h4">Ticket information</h2>
           <div className="row g-3">
             <ReadOnlyField label="Ticket Number" value="Generated after submission" />
@@ -1180,11 +1340,14 @@ function CreateTicketPage({
             <ReadOnlyField label="Current Status" value="New" />
             <ReadOnlyField label="IT Priority" value="Unassigned" />
             <div className="col-md-6">
-              <label className="form-label" htmlFor="category">Category *</label>
+              <label className="form-label" htmlFor="category">
+                Category <span className="required-marker">*</span>
+              </label>
               <select
                 id="category"
                 className="form-select"
                 required
+                aria-required="true"
                 value={form.categoryId}
                 onChange={(event) => updateField("categoryId", event.target.value)}
                 aria-invalid={Boolean(errors.categoryId)}
@@ -1196,11 +1359,14 @@ function CreateTicketPage({
               {fieldError("categoryId")}
             </div>
             <div className="col-md-6">
-              <label className="form-label" htmlFor="related-system">Related System *</label>
+              <label className="form-label" htmlFor="related-system">
+                Related System <span className="required-marker">*</span>
+              </label>
               <select
                 id="related-system"
                 className="form-select"
                 required
+                aria-required="true"
                 value={form.relatedSystemId}
                 onChange={(event) => updateField("relatedSystemId", event.target.value)}
                 aria-invalid={Boolean(errors.relatedSystemId)}
@@ -1212,11 +1378,14 @@ function CreateTicketPage({
               {fieldError("relatedSystemId")}
             </div>
             <div className="col-12">
-              <label className="form-label" htmlFor="ticket-summary">Ticket Summary *</label>
+              <label className="form-label" htmlFor="ticket-summary">
+                Ticket Summary <span className="required-marker">*</span>
+              </label>
               <input
                 id="ticket-summary"
                 className="form-control"
                 required
+                aria-required="true"
                 value={form.summary}
                 onChange={(event) => updateField("summary", event.target.value)}
                 aria-invalid={Boolean(errors.summary)}
@@ -1225,11 +1394,14 @@ function CreateTicketPage({
               {fieldError("summary")}
             </div>
             <div className="col-md-6">
-              <label className="form-label" htmlFor="requested-priority">Requested Priority *</label>
+              <label className="form-label" htmlFor="requested-priority">
+                Requested Priority <span className="required-marker">*</span>
+              </label>
               <select
                 id="requested-priority"
                 className="form-select"
                 required
+                aria-required="true"
                 value={form.requestedPriority}
                 onChange={(event) => updateField("requestedPriority", event.target.value)}
                 aria-invalid={Boolean(errors.requestedPriority)}
@@ -1243,11 +1415,14 @@ function CreateTicketPage({
               {fieldError("requestedPriority")}
             </div>
             <div className="col-12">
-              <label className="form-label" htmlFor="description">Description *</label>
+              <label className="form-label" htmlFor="description">
+                Description <span className="required-marker">*</span>
+              </label>
               <textarea
                 id="description"
-                className="form-control"
+                className="form-control description-field"
                 required
+                aria-required="true"
                 rows={7}
                 value={form.description}
                 onChange={(event) => updateField("description", event.target.value)}
@@ -1258,7 +1433,7 @@ function CreateTicketPage({
             </div>
           </div>
         </section>
-        <section className="card p-4 mb-3" aria-labelledby="attachments-heading">
+        <section className="card zen-card p-4 mb-3" aria-labelledby="attachments-heading">
           <h2 id="attachments-heading" className="h4">Attachments</h2>
           <p className="text-body-secondary">
             JPG/JPEG, PNG, WEBP, and PDF up to 5 MB each.
@@ -1302,7 +1477,13 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <div className="col-md-6">
       <label className="form-label" htmlFor={id}>{label}</label>
-      <input id={id} className="form-control bg-light" value={value} readOnly aria-readonly="true" />
+      <input
+        id={id}
+        className="form-control readonly-field"
+        value={value}
+        readOnly
+        aria-readonly="true"
+      />
     </div>
   );
 }

@@ -88,6 +88,7 @@ describe("AttachmentSection", () => {
     await user.click((await screen.findAllByRole("link", { name: "View ticket" }))[0]);
 
     expect(await screen.findByText("evidence.pdf")).toBeInTheDocument();
+    expect(screen.getByText("Removed attachments (1)")).toBeInTheDocument();
     expect(screen.getByText("REMOVED")).toBeInTheDocument();
     expect(screen.getByText(/Unavailable for download/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument();
