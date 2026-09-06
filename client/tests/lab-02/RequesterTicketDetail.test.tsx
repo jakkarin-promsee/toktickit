@@ -182,4 +182,34 @@ describe("Requester Ticket Detail", () => {
     });
     expect(screen.queryByText(/database secret/i)).not.toBeInTheDocument();
   });
+
+  it("shows active attachment actions and validates the removal reason", async () => {
+    const { user } = await openDetail();
+
+    expect(await screen.findByRole("button", { name: "Download" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    expect(screen.getByRole("dialog", { name: "Remove attachment?" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Confirm removal" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(/10–250 characters/i);
+  });
+
+  it("does not offer download or removal for a soft-removed attachment", async () => {
+    await openDetail({
+      data: {
+        ...ticket,
+        attachments: [{
+          ...ticket.attachments[0],
+          state: "REMOVED",
+          removedAt: "2026-09-06T04:00:00.000Z",
+          removedByDisplayName: "Anan Chai",
+          removalReason: "The evidence is no longer needed.",
+        }],
+      },
+    });
+
+    expect(await screen.findByText("Unavailable for download")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+  });
 });

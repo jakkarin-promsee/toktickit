@@ -17,11 +17,18 @@ const requesters = [
 const categories = [{ id: 2, name: "Hardware" }];
 const systems = [{ id: 7, name: "Corporate Laptop" }];
 
-function setupFetch(createResponse?: unknown) {
+function setupFetch(createResponse?: unknown, attachmentFailure = false) {
   return vi.fn().mockImplementation((url: string) => {
     if (url.endsWith("/api/requesters")) return Promise.resolve(jsonResponse({ data: requesters }));
     if (url.endsWith("/api/categories")) return Promise.resolve(jsonResponse(categories));
     if (url.endsWith("/api/related-systems")) return Promise.resolve(jsonResponse(systems));
+    if (url.includes("/attachments")) {
+      return Promise.resolve(
+        attachmentFailure
+          ? jsonResponse({ error: { message: "Storage unavailable." } }, 503)
+          : jsonResponse({ data: { id: "attachment-1", originalName: "evidence.pdf", state: "ACTIVE" } }),
+      );
+    }
     if (url.endsWith("/api/tickets")) {
       return Promise.resolve(
         createResponse instanceof Error
@@ -54,9 +61,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function openCreateTicket(createResponse?: unknown) {
+async function openCreateTicket(createResponse?: unknown, attachmentFailure = false) {
   localStorage.setItem("toktickit.requesterId", "1");
-  const fetch = setupFetch(createResponse);
+  const fetch = setupFetch(createResponse, attachmentFailure);
   vi.stubGlobal("fetch", fetch);
   const user = userEvent.setup();
   render(<App />);
@@ -127,5 +134,21 @@ describe("Create Ticket", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't create the ticket/i));
     expect(screen.getByLabelText(/ticket summary/i)).toHaveValue("Laptop battery drains quickly");
     expect(screen.queryByText(/database secret/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the created Ticket and offers retry when an initial attachment upload fails", async () => {
+    const { user } = await openCreateTicket(undefined, true);
+    await user.selectOptions(screen.getByLabelText(/category/i), "2");
+    await user.selectOptions(screen.getByLabelText(/related system/i), "7");
+    await user.type(screen.getByLabelText(/ticket summary/i), "Laptop battery drains quickly");
+    await user.selectOptions(screen.getByLabelText(/requested priority/i), "MEDIUM");
+    await user.type(screen.getByLabelText(/description/i), "Battery falls from full to 20% within one hour.");
+    const file = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], "evidence.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText(/supporting files/i), file);
+    await user.click(screen.getByRole("button", { name: /create ticket/i }));
+
+    expect(await screen.findByText(/official ticket number/i)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/upload.*failed/i);
+    expect(screen.getByRole("button", { name: /retry failed uploads/i })).toBeInTheDocument();
   });
 });

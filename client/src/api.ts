@@ -58,6 +58,73 @@ export interface TicketDetail extends CreatedTicket {
   attachments: TicketAttachmentMetadata[];
 }
 
+export async function uploadAttachment(
+  requesterId: number,
+  ticketId: string,
+  file: File,
+): Promise<TicketAttachmentMetadata> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+    method: "POST",
+    headers: { "X-Requester-Id": String(requesterId) },
+    body: form,
+  });
+  const payload = (await response.json()) as {
+    data?: TicketAttachmentMetadata;
+    error?: { message?: string };
+  };
+  if (!response.ok || !payload.data) {
+    const error = new Error(payload.error?.message ?? "Attachment could not be uploaded.") as Error & {
+      status?: number;
+    };
+    error.status = response.status;
+    throw error;
+  }
+  return payload.data;
+}
+
+export async function removeAttachment(
+  requesterId: number,
+  attachmentId: string,
+  reason: string,
+): Promise<TicketAttachmentMetadata> {
+  const response = await fetch(`${API_URL}/api/attachments/${attachmentId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Requester-Id": String(requesterId),
+    },
+    body: JSON.stringify({ reason }),
+  });
+  const payload = (await response.json()) as {
+    data?: TicketAttachmentMetadata;
+    error?: { message?: string };
+  };
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Attachment could not be removed.");
+  }
+  return payload.data;
+}
+
+export function attachmentDownloadUrl(attachmentId: string, inline = false): string {
+  return `${API_URL}/api/attachments/${attachmentId}/download${inline ? "?disposition=inline" : ""}`;
+}
+
+export async function downloadAttachment(
+  requesterId: number,
+  attachmentId: string,
+  inline = false,
+): Promise<Blob> {
+  const response = await fetch(attachmentDownloadUrl(attachmentId, inline), {
+    headers: { "X-Requester-Id": String(requesterId) },
+  });
+  if (!response.ok) {
+    throw new Error("Attachment could not be downloaded.");
+  }
+  return response.blob();
+}
+
 export interface TicketListQuery {
   search?: string;
   categoryId?: number;
