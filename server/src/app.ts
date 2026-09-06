@@ -10,6 +10,7 @@ import {
   CreateTicketInput,
   validateCreateTicketInput,
 } from "./ticket-validation.js";
+import { parseTicketQuery } from "./ticket-query.js";
 
 // The Express app is exported separately from app.listen() (see index.ts) so
 // Supertest can import `app` without opening a port. Do not merge these files.
@@ -150,6 +151,15 @@ function isUniqueConstraintError(error: unknown): boolean {
     error.code === "P2002";
 }
 
+function isDependencyError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientInitializationError ||
+    error instanceof Prisma.PrismaClientRustPanicError ||
+    (error instanceof Prisma.PrismaClientKnownRequestError &&
+      ["P1001", "P1002", "P2024"].includes(error.code))
+  );
+}
+
 async function createTicket(
   requesterId: number,
   input: CreateTicketInput,
@@ -254,6 +264,96 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("POST /api/tickets failed:", error);
     sendError(res, 500, "INTERNAL_ERROR", "Ticket could not be created. Please try again.");
+  }
+});
+
+app.get("/api/tickets", async (req: Request, res: Response) => {
+  const requester = await getActiveRequester(req, res);
+  if (!requester) return;
+
+  let query;
+  try {
+    query = parseTicketQuery(req.query as Record<string, unknown>);
+  } catch {
+    sendError(
+      res,
+      400,
+      "INVALID_QUERY",
+      "One or more ticket query parameters are invalid.",
+    );
+    return;
+  }
+
+  try {
+    const where: Prisma.TicketWhereInput = {
+      requesterId: requester.id,
+      ...(query.search
+        ? {
+            OR: [
+              { ticketNumber: { contains: query.search, mode: "insensitive" } },
+              { summary: { contains: query.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.relatedSystemId
+        ? { relatedSystemId: query.relatedSystemId }
+        : {}),
+      ...(query.status ? { currentStatus: query.status } : {}),
+      ...(query.requestedPriority
+        ? { requestedPriority: query.requestedPriority }
+        : {}),
+    };
+    const orderBy: Prisma.TicketOrderByWithRelationInput[] = [
+      { [query.sortBy]: query.sortOrder },
+      { id: query.sortOrder },
+    ];
+    const skip = (query.page - 1) * query.pageSize;
+    const prisma = getPrisma();
+    const [totalItems, tickets] = await Promise.all([
+      prisma.ticket.count({ where }),
+      prisma.ticket.findMany({
+        where,
+        orderBy,
+        skip,
+        take: query.pageSize,
+        select: {
+          id: true,
+          ticketNumber: true,
+          summary: true,
+          category: { select: { id: true, name: true } },
+          relatedSystem: { select: { id: true, name: true } },
+          requestedPriority: true,
+          itPriority: true,
+          currentStatus: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+    const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize);
+
+    res.status(200).json({
+      data: tickets,
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        totalItems,
+        totalPages,
+        hasPreviousPage: query.page > 1,
+        hasNextPage: query.page < totalPages,
+      },
+    });
+  } catch (error) {
+    console.error("GET /api/tickets failed:", error);
+    sendError(
+      res,
+      isDependencyError(error) ? 503 : 500,
+      isDependencyError(error) ? "DEPENDENCY_UNAVAILABLE" : "INTERNAL_ERROR",
+      isDependencyError(error)
+        ? "Tickets are temporarily unavailable."
+        : "Tickets could not be loaded. Please try again.",
+    );
   }
 });
 

@@ -28,6 +28,43 @@ export interface CreatedTicket {
   updatedAt: string;
 }
 
+export interface TicketListItem {
+  id: string;
+  ticketNumber: string;
+  summary: string;
+  category: Category;
+  relatedSystem: RelatedSystem;
+  requestedPriority: RequestedPriority;
+  itPriority: "UNASSIGNED" | "LOW" | "MEDIUM" | "HIGH";
+  currentStatus: "NEW";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TicketListQuery {
+  search?: string;
+  categoryId?: number;
+  relatedSystemId?: number;
+  status?: "NEW";
+  requestedPriority?: RequestedPriority;
+  sortBy?: "updatedAt" | "createdAt" | "ticketNumber" | "summary";
+  sortOrder?: "asc" | "desc";
+  page?: number;
+  pageSize?: 10 | 20 | 50;
+}
+
+export interface TicketListResponse {
+  data: TicketListItem[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+  };
+}
+
 export interface DevelopmentRequester {
   id: number;
   displayName: string;
@@ -135,6 +172,30 @@ export function getCategories(): Promise<Category[]> {
 
 export function getRelatedSystems(): Promise<RelatedSystem[]> {
   return getReferenceItems("/api/related-systems");
+}
+
+export async function getMyTickets(
+  requesterId: number,
+  query: TicketListQuery = {},
+): Promise<TicketListResponse> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const queryString = params.toString();
+  const response = await fetch(
+    `${API_URL}/api/tickets${queryString ? `?${queryString}` : ""}`,
+    { headers: { "X-Requester-Id": String(requesterId) } },
+  );
+  const payload = (await response.json()) as {
+    data?: TicketListItem[];
+    pagination?: TicketListResponse["pagination"];
+    error?: { message?: string };
+  };
+  if (!response.ok || !Array.isArray(payload.data) || !payload.pagination) {
+    throw new Error(payload.error?.message ?? "Tickets could not be loaded.");
+  }
+  return { data: payload.data, pagination: payload.pagination };
 }
 
 export async function createTicket(

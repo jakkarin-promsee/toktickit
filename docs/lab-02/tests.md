@@ -28,13 +28,13 @@ must create both owners explicitly. Binary fixtures include exact 5 MB and 5 MB 
 | UNIT-01 | Unit | BR-01 / AC-05 | Ticket Number format and collision retry at date/sequence boundaries | Unique `TKT-YYYYMMDD-NNNNNN` values | `server/tests/lab-02/ticket-number.test.ts` | Pass #11 |
 | DB-01 | Unit / schema | Data design / DoD | Prisma models, enums, relationships, indexes, migration SQL, required seed records, and repeatable upserts | Contracted schema and duplicate-safe seed foundation | `server/tests/lab-02/data-foundation.test.ts` | Pass #11 |
 | UNIT-02 | Unit | BR-09–BR-13 / AC-06 | Trimming, required values, 5/120 Summary and 10/2000 Description boundaries | Valid boundaries pass; outside values get field errors | `server/tests/lab-02/ticket-validation.test.ts` | Planned #13 |
-| UNIT-03 | Unit | BR-18–BR-21 / AC-08 | Query defaults, allowlists, normalization, stable secondary sort | Valid query object or safe invalid-query result | `server/tests/lab-02/ticket-query.test.ts` | Planned #14 |
+| UNIT-03 | Unit | BR-18–BR-21 / AC-08 | Query defaults, allowlists, normalization, stable secondary sort | Valid query object or safe invalid-query result | `server/tests/lab-02/ticket-query.test.ts` | Pass #14 |
 | UNIT-04 | Unit | BR-23–BR-26 / AC-12, AC-13 | Extension/MIME/signature, exact 5 MB boundary, safe storage name | Only permitted coherent files pass; UUID name generated | `server/tests/lab-02/attachment-validation.test.ts` | Planned #16 |
 | API-01 | API | FR-01 / AC-01 | Active Requester collection, sort, empty and database failure | `200` active-only/empty; safe `503` | `server/tests/lab-02/requesters.api.test.ts` | Pass #12 |
 | API-02 | API | FR-05 / AC-05 | Valid creation and backend-controlled owner/defaults/number | `201`; exactly one owned NEW Ticket | `server/tests/lab-02/create-ticket.api.test.ts` | Planned #13 |
 | API-03 | API | FR-05 / AC-06 | Invalid fields, boundaries, inactive references/context, protected fields | `400/422`; no Ticket saved | `server/tests/lab-02/create-ticket.api.test.ts` | Planned #13 |
-| API-04 | API | FR-08 / AC-08 | Ownership, search, each filter, combined filters, sort, pagination | Only owned matches with stable order/metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Planned #14 |
-| API-05 | API | BR-20–BR-21 / AC-08 | Invalid queries, page/page-size boundaries, page beyond end | `400` invalid; valid empty page metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Planned #14 |
+| API-04 | API | FR-08 / AC-08 | Ownership, search, each filter, combined filters, sort, pagination | Only owned matches with stable order/metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Pass #14 |
+| API-05 | API | BR-20–BR-21 / AC-08 | Invalid queries, page/page-size boundaries, page beyond end | `400` invalid; valid empty page metadata | `server/tests/lab-02/my-tickets.api.test.ts` | Pass #14 |
 | API-06 | API | FR-10–FR-11 / AC-10, AC-11 | Owned detail, malformed/missing ID, direct cross-owner access | `200` owned; same safe `404` missing/other owner | `server/tests/lab-02/ticket-detail.api.test.ts` | Planned #15 |
 | API-07 | API | FR-12–FR-14 / AC-12 | Upload/list/download permitted owned file, exact 5 MB, five active files | `201/200`; metadata and bytes match | `server/tests/lab-02/attachments.api.test.ts` | Planned #16 |
 | API-08 | API | BR-23–BR-26 / AC-13 | Unsupported, mismatched, 5 MB + 1, sixth, concurrent final-slot uploads, other owner, storage failure | Safe `404/413/415/422/503`; exactly one final-slot upload; no orphan | `server/tests/lab-02/attachments.api.test.ts` | Planned #16 |
@@ -45,7 +45,7 @@ must create both owners explicitly. Binary fixtures include exact 5 MB and 5 MB 
 | UI-03 | UI | FR-06 / AC-04 | All Create fields, required/read-only semantics, reference loading | Contracted labels and states render | `client/tests/lab-02/CreateTicket.test.tsx` | Planned #13 |
 | UI-04 | UI | FR-07 / AC-06, AC-07 | Client validation, first-invalid focus, dirty Clear confirmation, busy duplicate prevention, failure retention | Cancel preserves values; no invalid API call; one pending call; values retained | `client/tests/lab-02/CreateTicket.test.tsx` | Planned #13 |
 | UI-05 | UI | FR-05 / AC-05 | Successful create response and next actions | Official backend number shown; form resets at defined time | `client/tests/lab-02/CreateTicket.test.tsx` | Planned #13 |
-| UI-06 | UI | FR-08–FR-09 / AC-08, AC-09 | Search debounce, filters, sort, page reset, URL restoration, loading/empty/no-results/failure | Correct/restorable query and distinct usable states | `client/tests/lab-02/MyTickets.test.tsx` | Planned #14 |
+| UI-06 | UI | FR-08–FR-09 / AC-08, AC-09 | Search debounce, filters, sort, page reset, URL restoration, loading/empty/no-results/failure | Correct/restorable query and distinct usable states | `client/tests/lab-02/MyTickets.test.tsx` | Pass #14 |
 | UI-07 | UI | FR-10–FR-11 / AC-10, AC-11 | Read-only Detail, badges, back link, loading/not-found/failure, excluded controls | Owned fields shown; no forbidden workflow | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Planned #15 |
 | UI-08 | UI | FR-12–FR-16 / AC-12, AC-13, AC-15, AC-16 | File selection/errors, upload, removal dialog/reason, removed state | Valid lifecycle; invalid actions blocked and announced | `client/tests/lab-02/AttachmentSection.test.tsx` | Planned #16 |
 | UI-09 | UI | BR-27 / AC-14 | One initial upload fails after Ticket creation | Partial-success warning, Ticket link, failed-file retry | `client/tests/lab-02/CreateTicket.test.tsx` | Planned #16 |
@@ -129,8 +129,8 @@ database. E2E requires server/client processes plus a clean temporary Attachment
 | --- | --- | --- |
 | Engineering contract (`DOC-01`) | Pass in Issue #10 | `npm test -- --run tests/lab-02/engineering-contract.test.ts` |
 | Lab 1 regression | To run before Issue #10 handoff | Attach command output to PR |
-| Lab 2 unit/API | Issue #11 foundation and Issue #12 Requester API tests pass; Issues #13–#16 pending | `UNIT-01`, `DB-01`, and `API-01` pass in the full server suite |
-| Lab 2 UI/style | Issue #12 selector/context and Lab 1 regression pass; Issues #13–#17 pending | `UI-01`, `UI-02`, and existing Lab 1 UI tests pass |
+| Lab 2 unit/API | Issues #11–#14 foundation, requester, creation, and My Tickets tests pass; Issues #15–#16 pending | `UNIT-01`, `DB-01`, `API-01`, `UNIT-03`, `API-04`, and `API-05` pass in the full server suite |
+| Lab 2 UI/style | Issues #12–#14 selector/context, creation, and My Tickets tests pass; Issues #15–#17 pending | `UI-01`, `UI-02`, `UI-06`, and existing Lab 1 UI tests pass |
 | Lab 2 responsive/E2E | Planned for Issue #17 | Update after implementation |
 
 The Issue #10 PR may claim only that the contract and its structural test pass. Product completion remains
