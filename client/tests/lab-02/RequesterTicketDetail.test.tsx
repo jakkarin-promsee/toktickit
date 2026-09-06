@@ -187,11 +187,19 @@ describe("Requester Ticket Detail", () => {
     const { user } = await openDetail();
 
     expect(await screen.findByRole("button", { name: "Download" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Remove" }));
+    const removeButton = screen.getByRole("button", { name: "Remove" });
+    await user.click(removeButton);
     expect(screen.getByRole("dialog", { name: "Remove attachment?" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Confirm removal" }));
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Confirm removal" })).toBeDisabled();
+    await user.type(screen.getByLabelText("Removal reason"), "short");
     expect(screen.getByRole("alert")).toHaveTextContent(/10–250 characters/i);
+    await user.clear(screen.getByLabelText("Removal reason"));
+    await user.type(screen.getByLabelText("Removal reason"), "The file is no longer needed.");
+    expect(screen.getByRole("button", { name: "Confirm removal" })).toBeEnabled();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(removeButton).toHaveFocus());
   });
 
   it("does not offer download or removal for a soft-removed attachment", async () => {
@@ -209,6 +217,8 @@ describe("Requester Ticket Detail", () => {
     });
 
     expect(await screen.findByText("Unavailable for download")).toBeInTheDocument();
+    expect(screen.getByText(/Removed .* by Anan Chai/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reason: The evidence is no longer needed/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
   });

@@ -97,6 +97,7 @@ describe("Create Ticket", () => {
 
     expect(await screen.findByText(/summary must contain 5–120 characters/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/ticket summary/i)).toHaveAttribute("aria-invalid", "true");
+    await waitFor(() => expect(screen.getByLabelText(/category/i)).toHaveFocus());
     expect(fetch).not.toHaveBeenCalledWith(
       expect.stringContaining("/api/tickets"),
       expect.anything(),

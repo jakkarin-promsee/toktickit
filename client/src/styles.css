@@ -1,0 +1,133 @@
+:root[data-theme="zen-green"] {
+  --green-700: #006b3c;
+  --green-600: #0b7a46;
+  --green-050: #eaf6ef;
+  --page: #f5f7f6;
+  --surface: #ffffff;
+  --text: #17352a;
+  --muted: #5c6f67;
+  --border: #c8d5cf;
+  --readonly: #f1f3ee;
+  --danger: #9b1c1c;
+  --warning: #9a6700;
+}
+
+body {
+  background: var(--page);
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.app-header {
+  background: var(--green-700);
+  color: white;
+}
+
+.app-navigation {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-navigation .nav-link {
+  color: var(--text);
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+}
+
+.app-navigation .nav-link.active,
+.app-navigation .nav-link:hover {
+  color: var(--green-600);
+  font-weight: 700;
+}
+
+.app-menu-toggle {
+  display: none;
+}
+
+.readonly-field {
+  background: var(--readonly) !important;
+}
+
+.form-control,
+.form-select,
+.btn {
+  min-height: 44px;
+}
+
+.description-field {
+  min-height: 160px;
+}
+
+.zen-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgb(23 53 42 / 8%);
+}
+
+.required-marker {
+  color: var(--danger);
+}
+
+.badge-zen {
+  background: var(--green-050);
+  color: var(--text);
+}
+
+.badge-priority {
+  background: #fff3cd;
+  color: #664d03;
+}
+
+.badge-muted {
+  background: #e9ecef;
+  color: var(--text);
+}
+
+.list-group-item {
+  overflow-wrap: anywhere;
+}
+
+.modal[aria-modal="true"] {
+  background: rgb(23 53 42 / 35%);
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid var(--green-600);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .app-menu-toggle {
+    display: inline-block;
+  }
+
+  .app-navigation .nav-links {
+    display: none;
+    width: 100%;
+  }
+
+  .app-navigation .nav-links.is-open {
+    display: block;
+  }
+
+  .app-navigation {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .app-navigation .nav-links .nav-link {
+    display: block;
+  }
+
+  .app-header {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .app-header .requester-identity {
+    order: 3;
+    width: 100%;
+  }
+}

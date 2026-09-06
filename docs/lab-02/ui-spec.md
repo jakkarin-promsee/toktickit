@@ -1,5 +1,7 @@
 # Lab 2 UI Specification
 
+Status: Approved contract; implementation and visual verification complete through Issue #17
+
 This document is the visual and interaction contract for Requester Selection, Create Ticket, My Tickets,
 Ticket Detail, and Attachments. It refines FR-01–FR-17 and AC-01–AC-17.
 
@@ -180,14 +182,14 @@ invalid field.
 
 ## 10. Visual evidence checklist
 
-- [ ] Primary/secondary greens, quiet page, white cards, readable charcoal text match tokens.
-- [ ] Editable, read-only, invalid, focused, disabled, and busy controls are visibly distinct.
-- [ ] Required markers and immediate field messages are present.
-- [ ] Navigation identity and active-page indication work at all widths.
-- [ ] Create initial, validation, submitting, success, API failure, and invalid-file states are captured.
-- [ ] My Tickets results, empty, no-results, filtering, sorting, and pagination are captured.
-- [ ] Detail active/removed Attachment states and safe denied state are captured.
-- [ ] Desktop (1440×900), tablet (820×1180), and mobile (390×844) have no clipping, overlap, hidden
+- [x] Primary/secondary greens, quiet page, white cards, readable charcoal text match tokens.
+- [x] Editable, read-only, invalid, focused, disabled, and busy controls are visibly distinct.
+- [x] Required markers and immediate field messages are present.
+- [x] Navigation identity and active-page indication work at all widths.
+- [x] Create initial, validation, submitting, success, API failure, and invalid-file states are captured.
+- [x] My Tickets results, empty, no-results, filtering, sorting, and pagination are captured.
+- [x] Detail active/removed Attachment states and safe denied state are captured.
+- [x] Desktop (1440×900), tablet (820×1180), and mobile (390×844) have no clipping, overlap, hidden
       buttons, or horizontal page overflow.
 
 Screenshots belong under `artifacts/lab-02/screenshots/{create-ticket,my-tickets,ticket-detail}/`.

@@ -87,6 +87,10 @@ describe("My Tickets", () => {
     expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getByRole("article")).toHaveTextContent(ticket.ticketNumber);
+    expect(screen.getByRole("article")).toHaveTextContent("Hardware");
+    expect(screen.getByRole("article")).toHaveTextContent("Requested Priority: MEDIUM");
+    expect(screen.getByRole("article")).toHaveTextContent("Status: NEW");
+    expect(screen.getByRole("article")).toHaveTextContent("Updated");
     expect(screen.getAllByRole("link", { name: "View ticket" }).length).toBeGreaterThan(0);
   });
 
