@@ -8,8 +8,11 @@ import {
   getCategories,
   getDevelopmentRequesters,
   getRelatedSystems,
+  getMyTickets,
   RelatedSystem,
   RequestedPriority,
+  TicketListItem,
+  TicketListResponse,
 } from "./api.js";
 
 type RequesterState = "loading" | "ready" | "empty" | "error";
@@ -247,16 +250,389 @@ export default function App() {
         {page === "create-ticket" ? (
           <CreateTicketPage requester={selectedRequester} onBack={() => setPage("my-tickets")} />
         ) : (
-          <>
-            <h1>My Tickets</h1>
-            <p className="text-body-secondary">
-              Your ticket list will be available here. Create a ticket to get started.
-            </p>
-          </>
+          <MyTicketsPage requester={selectedRequester} onCreate={() => setPage("create-ticket")} />
         )}
       </main>
     </div>
   );
+}
+
+type TicketQueryState = {
+  search: string;
+  categoryId: string;
+  relatedSystemId: string;
+  status: string;
+  requestedPriority: string;
+  sortBy: "updatedAt" | "createdAt" | "ticketNumber" | "summary";
+  sortOrder: "asc" | "desc";
+  page: number;
+  pageSize: 10 | 20 | 50;
+};
+
+const defaultTicketQuery: TicketQueryState = {
+  search: "",
+  categoryId: "",
+  relatedSystemId: "",
+  status: "",
+  requestedPriority: "",
+  sortBy: "updatedAt",
+  sortOrder: "desc",
+  page: 1,
+  pageSize: 10,
+};
+
+function getInitialTicketQuery(): TicketQueryState {
+  const params = new URLSearchParams(window.location.search);
+  const page = Number(params.get("page"));
+  const pageSize = Number(params.get("pageSize"));
+  const sortBy = params.get("sortBy");
+  const sortOrder = params.get("sortOrder");
+  return {
+    ...defaultTicketQuery,
+    search: params.get("search") ?? "",
+    categoryId: params.get("categoryId") ?? "",
+    relatedSystemId: params.get("relatedSystemId") ?? "",
+    status: params.get("status") === "NEW" ? "NEW" : "",
+    requestedPriority: ["LOW", "MEDIUM", "HIGH"].includes(
+      params.get("requestedPriority") ?? "",
+    )
+      ? params.get("requestedPriority") ?? ""
+      : "",
+    sortBy:
+      sortBy === "createdAt" ||
+      sortBy === "ticketNumber" ||
+      sortBy === "summary"
+        ? sortBy
+        : "updatedAt",
+    sortOrder: sortOrder === "asc" ? "asc" : "desc",
+    page: Number.isSafeInteger(page) && page > 0 ? page : 1,
+    pageSize: pageSize === 20 || pageSize === 50 ? pageSize : 10,
+  };
+}
+
+function MyTicketsPage({
+  requester,
+  onCreate,
+}: {
+  requester: DevelopmentRequester;
+  onCreate: () => void;
+}) {
+  const [query, setQuery] = useState(getInitialTicketQuery);
+  const [tickets, setTickets] = useState<TicketListItem[]>([]);
+  const [pagination, setPagination] = useState<TicketListResponse["pagination"] | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [systems, setSystems] = useState<RelatedSystem[]>([]);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (query.search) params.set("search", query.search);
+    if (query.categoryId) params.set("categoryId", query.categoryId);
+    if (query.relatedSystemId) params.set("relatedSystemId", query.relatedSystemId);
+    if (query.status) params.set("status", query.status);
+    if (query.requestedPriority) params.set("requestedPriority", query.requestedPriority);
+    if (query.sortBy !== "updatedAt") params.set("sortBy", query.sortBy);
+    if (query.sortOrder !== "desc") params.set("sortOrder", query.sortOrder);
+    if (query.page !== 1) params.set("page", String(query.page));
+    if (query.pageSize !== 10) params.set("pageSize", String(query.pageSize));
+    const nextSearch = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`,
+    );
+  }, [query]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([getCategories(), getRelatedSystems()])
+      .then(([loadedCategories, loadedSystems]) => {
+        if (!active) return;
+        setCategories(loadedCategories);
+        setSystems(loadedSystems);
+      })
+      .catch(() => {
+        // Ticket loading remains actionable even when filter metadata is unavailable.
+      });
+    return () => {
+      active = false;
+    };
+  }, [requester.id]);
+
+  useEffect(() => {
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setState("loading");
+      const request = {
+        ...(query.search ? { search: query.search } : {}),
+        ...(query.categoryId ? { categoryId: Number(query.categoryId) } : {}),
+        ...(query.relatedSystemId ? { relatedSystemId: Number(query.relatedSystemId) } : {}),
+        ...(query.status ? { status: "NEW" as const } : {}),
+        ...(query.requestedPriority
+          ? { requestedPriority: query.requestedPriority as RequestedPriority }
+          : {}),
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
+        page: query.page,
+        pageSize: query.pageSize,
+      };
+      void getMyTickets(requester.id, request)
+        .then((result) => {
+          if (!active) return;
+          setTickets(result.data);
+          setPagination(result.pagination);
+          setState("ready");
+        })
+        .catch(() => {
+          if (active) setState("error");
+        });
+    }, 300);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [requester.id, query]);
+
+  function changeQuery<K extends keyof TicketQueryState>(
+    key: K,
+    value: TicketQueryState[K],
+  ) {
+    setQuery((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === "page" ? {} : { page: 1 }),
+    }));
+  }
+
+  function clearFilters() {
+    setQuery(defaultTicketQuery);
+  }
+
+  const hasCriteria = Boolean(
+    query.search ||
+      query.categoryId ||
+      query.relatedSystemId ||
+      query.status ||
+      query.requestedPriority,
+  );
+  const empty = state === "ready" && tickets.length === 0 && !hasCriteria;
+  const noResults = state === "ready" && tickets.length === 0 && hasCriteria;
+
+  return (
+    <section aria-labelledby="my-tickets-heading">
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h1 id="my-tickets-heading">My Tickets</h1>
+        <button className="btn btn-success" onClick={onCreate}>Create Ticket</button>
+      </div>
+      <section className="card p-3 mb-3" aria-label="Ticket search and filters">
+        <div className="row g-2">
+          <div className="col-12">
+            <label className="form-label" htmlFor="ticket-search">Search</label>
+            <input
+              id="ticket-search"
+              className="form-control"
+              placeholder="Search ticket number or summary"
+              value={query.search}
+              onChange={(event) => changeQuery("search", event.target.value)}
+            />
+          </div>
+          <FilterSelect
+            id="ticket-category"
+            label="Category"
+            value={query.categoryId}
+            onChange={(value) => changeQuery("categoryId", value)}
+            options={categories}
+          />
+          <FilterSelect
+            id="ticket-system"
+            label="Related System"
+            value={query.relatedSystemId}
+            onChange={(value) => changeQuery("relatedSystemId", value)}
+            options={systems}
+          />
+          <div className="col-md-3">
+            <label className="form-label" htmlFor="ticket-status">Status</label>
+            <select
+              id="ticket-status"
+              className="form-select"
+              value={query.status}
+              onChange={(event) => changeQuery("status", event.target.value)}
+            >
+              <option value="">Any status</option>
+              <option value="NEW">New</option>
+            </select>
+          </div>
+          <div className="col-md-3">
+            <label className="form-label" htmlFor="ticket-priority">Requested Priority</label>
+            <select
+              id="ticket-priority"
+              className="form-select"
+              value={query.requestedPriority}
+              onChange={(event) => changeQuery("requestedPriority", event.target.value)}
+            >
+              <option value="">Any priority</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+            </select>
+          </div>
+          <div className="col-md-3">
+            <label className="form-label" htmlFor="ticket-sort">Sort by</label>
+            <select
+              id="ticket-sort"
+              className="form-select"
+              value={query.sortBy}
+              onChange={(event) =>
+                changeQuery("sortBy", event.target.value as TicketQueryState["sortBy"])
+              }
+            >
+              <option value="updatedAt">Last updated</option>
+              <option value="createdAt">Created date</option>
+              <option value="ticketNumber">Ticket number</option>
+              <option value="summary">Summary</option>
+            </select>
+          </div>
+          <div className="col-md-3">
+            <label className="form-label" htmlFor="ticket-sort-order">Sort order</label>
+            <select
+              id="ticket-sort-order"
+              className="form-select"
+              value={query.sortOrder}
+              onChange={(event) =>
+                changeQuery("sortOrder", event.target.value as TicketQueryState["sortOrder"])
+              }
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </div>
+        </div>
+        <button className="btn btn-outline-secondary mt-3" onClick={clearFilters}>
+          Clear filters
+        </button>
+      </section>
+
+      {state === "loading" && <p role="status">Loading tickets…</p>}
+      {state === "error" && (
+        <div className="alert alert-danger" role="alert">
+          <p>We couldn't load your tickets. Please try again.</p>
+          <button className="btn btn-outline-danger" onClick={() => setQuery({ ...query })}>
+            Retry
+          </button>
+        </div>
+      )}
+      {empty && (
+        <div className="alert alert-info" role="status">
+          <p>You have no tickets yet.</p>
+          <button className="btn btn-success" onClick={onCreate}>Create your first ticket</button>
+        </div>
+      )}
+      {noResults && (
+        <div className="alert alert-info" role="status">
+          <p>No tickets match your search and filters.</p>
+          <button className="btn btn-outline-secondary" onClick={clearFilters}>Clear filters</button>
+        </div>
+      )}
+      {state === "ready" && tickets.length > 0 && (
+        <>
+          <div className="table-responsive d-none d-md-block">
+            <table className="table align-middle">
+              <caption className="visually-hidden">Tickets owned by {requester.displayName}</caption>
+              <thead>
+                <tr>
+                  <th>Ticket Number</th><th>Summary</th><th>Category</th>
+                  <th>Requested Priority</th><th>Status</th><th>Last Updated</th><th>View</th>
+                </tr>
+              </thead>
+              <tbody>{tickets.map((ticket) => <TicketRow key={ticket.id} ticket={ticket} />)}</tbody>
+            </table>
+          </div>
+          <div className="d-md-none">
+            {tickets.map((ticket) => (
+              <article className="card p-3 mb-2" key={ticket.id}>
+                <h2 className="h5">{ticket.ticketNumber}</h2>
+                <p>{ticket.summary}</p>
+                <p className="mb-1">{ticket.category.name} · {ticket.currentStatus}</p>
+                <p className="mb-2">Updated {formatDate(ticket.updatedAt)}</p>
+                <a href={`#ticket-${ticket.id}`}>View ticket</a>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+      {pagination && (
+        <nav className="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Ticket pagination">
+          <span>
+            Page {pagination.page} of {pagination.totalPages || 0} ({pagination.totalItems} total)
+          </span>
+          <button
+            className="btn btn-outline-secondary"
+            disabled={!pagination.hasPreviousPage}
+            onClick={() => changeQuery("page", Math.max(1, query.page - 1))}
+          >Previous</button>
+          <button
+            className="btn btn-outline-secondary"
+            disabled={!pagination.hasNextPage}
+            onClick={() => changeQuery("page", query.page + 1)}
+          >Next</button>
+          <label htmlFor="ticket-page-size" className="visually-hidden">Tickets per page</label>
+          <select
+            id="ticket-page-size"
+            className="form-select"
+            style={{ width: "auto" }}
+            value={query.pageSize}
+            onChange={(event) => changeQuery("pageSize", Number(event.target.value) as 10 | 20 | 50)}
+          >
+            <option value="10">10 per page</option>
+            <option value="20">20 per page</option>
+            <option value="50">50 per page</option>
+          </select>
+        </nav>
+      )}
+    </section>
+  );
+}
+
+function FilterSelect({
+  id,
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ id: number; name: string }>;
+}) {
+  return (
+    <div className="col-md-3">
+      <label className="form-label" htmlFor={id}>{label}</label>
+      <select id={id} className="form-select" value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Any {label.toLowerCase()}</option>
+        {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function TicketRow({ ticket }: { ticket: TicketListItem }) {
+  return (
+    <tr>
+      <td>{ticket.ticketNumber}</td>
+      <td>{ticket.summary}</td>
+      <td>{ticket.category.name}</td>
+      <td>{ticket.requestedPriority}</td>
+      <td>{ticket.currentStatus}</td>
+      <td>{formatDate(ticket.updatedAt)}</td>
+      <td><a href={`#ticket-${ticket.id}`}>View ticket</a></td>
+    </tr>
+  );
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString();
 }
 
 function CreateTicketPage({
