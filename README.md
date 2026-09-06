@@ -77,7 +77,9 @@ npx prisma migrate dev
 npx prisma db seed
 ```
 
-The seed is idempotent — running it more than once will not create duplicate categories.
+The seed is idempotent — running it more than once will not create duplicate categories, related
+systems, or Development Requesters. Stable category/system names and Requester email addresses are the
+upsert keys.
 
 ### 5. Run both sides
 
