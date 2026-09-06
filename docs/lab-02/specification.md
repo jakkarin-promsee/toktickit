@@ -1,6 +1,6 @@
 # Lab 2 Sprint Engineering Specification
 
-Status: Approved contract; product implementation verified locally through Issue #17
+Status: Approved contract; Issues #10–#18 complete and released to `main`
 Issue: #10
 Branch: `feature/10-lab2-engineering-contract`
 
@@ -232,8 +232,8 @@ stable `{ error: { code, message, fields? } }` shape.
 - [x] Desktop, tablet, and mobile screenshots and the visual checklist show no clipping, overlap, hidden
       actions, or horizontal overflow.
 - [x] Setup, migration, seed, run, test, storage, and cleanup instructions are current in README.
-- [ ] A peer approves each feature PR into `lab2-staging`; review comments are resolved and recorded.
-- [ ] The release PR from `lab2-staging` to `main` passes final tests and contains required course evidence.
+- [x] A peer approves each feature PR into `lab2-staging`; review comments are resolved and recorded.
+- [x] The release PR from `lab2-staging` to `main` passes final tests and contains required course evidence.
 
 ## 11. Assumptions and Decisions
 

@@ -1,6 +1,6 @@
 # Lab 2 REST API Specification
 
-Status: Approved and verified through Issue #17
+Status: Approved and verified through Issues #10–#18
 
 Base URL: `/api`
 Media type: `application/json` except multipart upload and binary download

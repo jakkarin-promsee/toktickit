@@ -1,6 +1,6 @@
 # Lab 2 Test Plan and Results
 
-Status: Implementation and local verification complete through Issue #17; peer-review evidence pending
+Status: Implementation, peer review, and release complete through Issues #10–#18
 Last verified: 6 September 2026
 
 ## 1. Test Strategy
@@ -148,8 +148,8 @@ data in the default schema is not changed.
 | Lab 2 responsive/E2E/visual | 9 Playwright tests passed | `npm run test:e2e` using isolated `lab2_e2e` schema |
 | Production builds | Pass | `npm --prefix server run build`; `npm --prefix client run build` |
 
-Issue #17 product verification is complete locally. Peer-review evidence and the Issue #18 release PR remain
-course-delivery steps rather than unverified product claims.
+Issue #17 product verification, peer approval (PR #26), and the Issue #18 release to `main` (PR #27) are
+complete. Review evidence is recorded in `reviewer.md`.
 
 ## 7. Known Limitations or Deferred Tests
 

@@ -1,7 +1,7 @@
 # Lab 2 — Peer Review Record
 
-Status: Issue #17 implementation and local verification are complete. Feature PRs through Issue #16 are
-merged; the Issue #17 integration PR, its peer approval, and the Issue #18 release PR are still pending.
+Status: Issues #10–#18 are complete. Feature PRs #19–#26 were peer-approved into `lab2-staging`,
+and release PR #27 from `lab2-staging` to `main` was approved and merged.
 
 | Role              | Full Name         | Student ID  | GitHub username                                          |
 | ----------------- | ----------------- | ----------- | -------------------------------------------------------- |
@@ -23,6 +23,8 @@ merged; the Issue #17 integration PR, its peer approval, and the Issue #18 relea
 | [#23](https://github.com/jakkarin-promsee/toktickit/pull/23) | #14   | My Tickets search, filter, sort, and pagination | `feature/14-my-tickets`                    | [Review](https://github.com/jakkarin-promsee/toktickit/pull/23#pullrequestreview-5125151916) | ✅ Approved and merged |
 | [#24](https://github.com/jakkarin-promsee/toktickit/pull/24) | #15   | Requester-owned Ticket Detail                   | `feature/15-requester-ticket-detail`       | [Review](https://github.com/jakkarin-promsee/toktickit/pull/24#pullrequestreview-5125237958) | ✅ Approved and merged |
 | [#25](https://github.com/jakkarin-promsee/toktickit/pull/25) | #16   | Attachment upload, download, and soft removal   | `feature/16-attachment-lifecycle`          | [Review](https://github.com/jakkarin-promsee/toktickit/pull/25#pullrequestreview-5125314634) | ✅ Approved and merged |
+| [#26](https://github.com/jakkarin-promsee/toktickit/pull/26) | #17   | Lab 2 integration, responsive QA, and visual evidence | `feature/17-lab2-integration-evidence` | [Review](https://github.com/jakkarin-promsee/toktickit/pull/26#pullrequestreview-5125699651) | ✅ Approved and merged |
+| [#27](https://github.com/jakkarin-promsee/toktickit/pull/27) | #18   | Release Lab 2 from lab2-staging to main         | `lab2-staging`                             | [Review](https://github.com/jakkarin-promsee/toktickit/pull/27#pullrequestreview-5125754410) | ✅ Approved and merged |
 
 ### PRs I reviewed — authored by my partner
 
@@ -35,7 +37,11 @@ merged; the Issue #17 integration PR, its peer approval, and the Issue #18 relea
 | [#24](https://github.com/UsernameJillzaza/toktickit/pull/24) | #17           | My Tickets list                                        | `feature/5-my-tickets`                | [Review](https://github.com/UsernameJillzaza/toktickit/pull/24#pullrequestreview-5125199501)                                                                                                             | ✅ Approved                                             |
 | [#25](https://github.com/UsernameJillzaza/toktickit/pull/25) | #18           | Ticket Detail and Attachments                          | `feature/6-ticket-detail-attachments` | [Review](https://github.com/UsernameJillzaza/toktickit/pull/25#pullrequestreview-5125259663)                                                                                                             | ✅ Approved                                             |
 | [#26](https://github.com/UsernameJillzaza/toktickit/pull/26) | #19           | Zen Green UI polish and responsive pass                | `feature/7-ui-polish`                 | [Review](https://github.com/UsernameJillzaza/toktickit/pull/26#pullrequestreview-5125332893)                                                                                                             | ✅ Approved                                             |
-| [#27](https://github.com/UsernameJillzaza/toktickit/pull/27) | Documentation | Lab 2 documentation: reviewer record and AI use report | `feature/8-lab2-docs`                 | [Review](https://github.com/UsernameJillzaza/toktickit/pull/27#pullrequestreview-5125404347)                                                                                                             | ✅ Approved; PR still open when this record was updated |
+| [#27](https://github.com/UsernameJillzaza/toktickit/pull/27) | Documentation | Lab 2 documentation: reviewer record and AI use report | `feature/8-lab2-docs`                 | [Review](https://github.com/UsernameJillzaza/toktickit/pull/27#pullrequestreview-5125404347)                                                                                                             | ✅ Approved and merged                                  |
+| [#28](https://github.com/UsernameJillzaza/toktickit/pull/28) | Release       | Lab 2 release                                          | `lab2-staging`                        | [Review](https://github.com/UsernameJillzaza/toktickit/pull/28#pullrequestreview-5125557354)                                                                                                             | ✅ Approved and merged                                  |
+| [#29](https://github.com/UsernameJillzaza/toktickit/pull/29) | Documentation | Mark tests.md Final status Pass with real results      | `feature/9-final-test-results`        | [Review](https://github.com/UsernameJillzaza/toktickit/pull/29#pullrequestreview-5125643981)                                                                                                             | ✅ Approved and merged                                  |
+| [#30](https://github.com/UsernameJillzaza/toktickit/pull/30) | Release       | Lab 2 release: final tests.md status update            | `lab2-staging`                        | [Review](https://github.com/UsernameJillzaza/toktickit/pull/30#pullrequestreview-5125667358)                                                                                                             | ✅ Approved and merged                                  |
+| [#31](https://github.com/UsernameJillzaza/toktickit/pull/31) | Fix           | Fix ticket number collision on gaps + real responsive screenshots | `fix/ticket-number-gap-collision` | [Review](https://github.com/UsernameJillzaza/toktickit/pull/31#pullrequestreview-5125768940)                                                                                                             | ✅ Approved and merged                                  |
 
 ## Notable comments, responses, and resolutions
 

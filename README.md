@@ -153,6 +153,6 @@ toktickit/
 
 ## Git workflow
 
-Lab 2 feature branches `feature/10-*` through `feature/17-*` target `lab2-staging`. Each feature enters
-staging through a peer-reviewed PR. Issue #18 tracks the final release PR from `lab2-staging` to `main`.
+Lab 2 feature branches `feature/10-*` through `feature/17-*` targeted `lab2-staging`. Each feature entered
+staging through a peer-reviewed PR. Issue #18 released `lab2-staging` to `main` via PR #27.
 No feature development happens directly on `main` or `lab2-staging`.
