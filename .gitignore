@@ -21,3 +21,8 @@ plan/
 
 # runtime attachment storage
 server/storage/attachments/
+
+# Playwright runtime output
+playwright-report/
+test-results/
+.tmp/

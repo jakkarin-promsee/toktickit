@@ -1,0 +1,29 @@
+{
+  "name": "toktickit",
+  "version": "1.0.0",
+  "description": "TokTickIT requester ticketing MVP for CPE334 Lab 2.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "npm --prefix server test && npm --prefix client test",
+    "test:e2e": "playwright test e2e/lab-02",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jakkarin-promsee/toktickit.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/jakkarin-promsee/toktickit/issues"
+  },
+  "homepage": "https://github.com/jakkarin-promsee/toktickit#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}
