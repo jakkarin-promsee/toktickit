@@ -475,3 +475,39 @@ export function staffMutation(path: string, method: "POST" | "PATCH", body: Reco
 export function postInternalNote(ticketId: string, content: string, csrfToken: string): Promise<PublicComment> {
   return authRequest<PublicComment>(`/api/staff/tickets/${ticketId}/internal-notes`, { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify({ content }) });
 }
+
+export interface UserSummary {
+  id: number;
+  displayName: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function adminHeaders(csrfToken: string) {
+  return { Origin: window.location.origin, "X-CSRF-Token": csrfToken };
+}
+
+export function listUsers(search: string, role: string): Promise<UserSummary[]> {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  if (role) params.set("role", role);
+  const text = params.toString();
+  return authRequest<UserSummary[]>(`/api/admin/users${text ? `?${text}` : ""}`);
+}
+
+export function createUser(input: { displayName: string; email: string; role: UserRole; isActive: boolean; initialPassword: string }, csrfToken: string): Promise<UserSummary> {
+  return authRequest<UserSummary>("/api/admin/users", { method: "POST", headers: adminHeaders(csrfToken), body: JSON.stringify(input) });
+}
+
+export function updateUser(id: number, input: { displayName: string; email: string; role: UserRole; isActive: boolean; version: number }, csrfToken: string): Promise<UserSummary> {
+  return authRequest<UserSummary>(`/api/admin/users/${id}`, { method: "PATCH", headers: adminHeaders(csrfToken), body: JSON.stringify(input) });
+}
+
+export function setInitialPassword(id: number, initialPassword: string, csrfToken: string): Promise<void> {
+  return authRequest<void>(`/api/admin/users/${id}/initial-password`, { method: "POST", headers: adminHeaders(csrfToken), body: JSON.stringify({ initialPassword }) });
+}
