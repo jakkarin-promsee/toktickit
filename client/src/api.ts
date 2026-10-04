@@ -12,6 +12,8 @@ export interface RelatedSystem {
 
 export type RequestedPriority = "LOW" | "MEDIUM" | "HIGH";
 
+export type TicketStatus = "NEW" | "OPEN" | "IN_PROGRESS" | "WAITING_FOR_REQUESTER" | "RESOLVED" | "CLOSED" | "REOPENED" | "CANCELLED";
+
 export interface CreatedTicket {
   id: string;
   ticketNumber: string;
@@ -21,8 +23,8 @@ export interface CreatedTicket {
   relatedSystem: RelatedSystem;
   summary: string;
   requestedPriority: RequestedPriority;
-  itPriority: "UNASSIGNED";
-  currentStatus: "NEW";
+  itPriority: "LOW" | "MEDIUM" | "HIGH";
+  currentStatus: TicketStatus;
   description: string;
   createdAt: string;
   updatedAt: string;
@@ -36,7 +38,7 @@ export interface TicketListItem {
   relatedSystem: RelatedSystem;
   requestedPriority: RequestedPriority;
   itPriority: "UNASSIGNED" | "LOW" | "MEDIUM" | "HIGH";
-  currentStatus: "NEW";
+  currentStatus: TicketStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,18 +58,28 @@ export interface TicketAttachmentMetadata {
 
 export interface TicketDetail extends CreatedTicket {
   attachments: TicketAttachmentMetadata[];
+  requesterResolvedAt: string | null;
+  version: number;
+}
+
+export interface PublicComment {
+  id: string;
+  content: string;
+  author: { id: number; displayName: string };
+  createdAt: string;
 }
 
 export async function uploadAttachment(
-  requesterId: number,
   ticketId: string,
   file: File,
+  csrfToken: string,
 ): Promise<TicketAttachmentMetadata> {
   const form = new FormData();
   form.append("file", file);
   const response = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
     method: "POST",
-    headers: { "X-Requester-Id": String(requesterId) },
+    credentials: "include",
+    headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken },
     body: form,
   });
   const payload = (await response.json()) as {
@@ -85,16 +97,18 @@ export async function uploadAttachment(
 }
 
 export async function removeAttachment(
-  requesterId: number,
   attachmentId: string,
   reason: string,
+  csrfToken: string,
 ): Promise<TicketAttachmentMetadata> {
   const response = await fetch(`${API_URL}/api/attachments/${attachmentId}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      "X-Requester-Id": String(requesterId),
+      Origin: window.location.origin,
+      "X-CSRF-Token": csrfToken,
     },
+    credentials: "include",
     body: JSON.stringify({ reason }),
   });
   const payload = (await response.json()) as {
@@ -112,12 +126,11 @@ export function attachmentDownloadUrl(attachmentId: string, inline = false): str
 }
 
 export async function downloadAttachment(
-  requesterId: number,
   attachmentId: string,
   inline = false,
 ): Promise<Blob> {
   const response = await fetch(attachmentDownloadUrl(attachmentId, inline), {
-    headers: { "X-Requester-Id": String(requesterId) },
+    credentials: "include",
   });
   if (!response.ok) {
     throw new Error("Attachment could not be downloaded.");
@@ -147,12 +160,6 @@ export interface TicketListResponse {
     hasPreviousPage: boolean;
     hasNextPage: boolean;
   };
-}
-
-export interface DevelopmentRequester {
-  id: number;
-  displayName: string;
-  email: string;
 }
 
 export interface SystemStatus {
@@ -216,28 +223,6 @@ export async function checkSystem(): Promise<SystemStatus> {
   return { online: true, categories: payload as Category[] };
 }
 
-export async function getDevelopmentRequesters(): Promise<
-  DevelopmentRequester[]
-> {
-  const response = await fetch(`${API_URL}/api/requesters`);
-
-  if (!response.ok) {
-    throw new Error(`Requester list failed with HTTP ${response.status}`);
-  }
-
-  const payload: unknown = await response.json();
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !Array.isArray((payload as { data?: unknown }).data) ||
-    !(payload as { data: unknown[] }).data.every(isRequester)
-  ) {
-    throw new Error("Requester list returned an unexpected payload");
-  }
-
-  return (payload as { data: DevelopmentRequester[] }).data;
-}
-
 async function getReferenceItems(path: string): Promise<Category[]> {
   const response = await fetch(`${API_URL}${path}`);
   if (!response.ok) {
@@ -259,7 +244,6 @@ export function getRelatedSystems(): Promise<RelatedSystem[]> {
 }
 
 export async function getMyTickets(
-  requesterId: number,
   query: TicketListQuery = {},
 ): Promise<TicketListResponse> {
   const params = new URLSearchParams();
@@ -269,7 +253,7 @@ export async function getMyTickets(
   const queryString = params.toString();
   const response = await fetch(
     `${API_URL}/api/tickets${queryString ? `?${queryString}` : ""}`,
-    { headers: { "X-Requester-Id": String(requesterId) } },
+    { credentials: "include" },
   );
   const payload = (await response.json()) as {
     data?: TicketListItem[];
@@ -283,11 +267,10 @@ export async function getMyTickets(
 }
 
 export async function getTicketDetail(
-  requesterId: number,
   ticketId: string,
 ): Promise<TicketDetail> {
   const response = await fetch(`${API_URL}/api/tickets/${ticketId}`, {
-    headers: { "X-Requester-Id": String(requesterId) },
+    credentials: "include",
   });
   const payload = (await response.json()) as {
     data?: TicketDetail;
@@ -306,7 +289,6 @@ export async function getTicketDetail(
 }
 
 export async function createTicket(
-  requesterId: number,
   input: {
     categoryId: number;
     relatedSystemId: number;
@@ -314,13 +296,16 @@ export async function createTicket(
     requestedPriority: RequestedPriority;
     description: string;
   },
+  csrfToken: string,
 ): Promise<CreatedTicket> {
   const response = await fetch(`${API_URL}/api/tickets`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Requester-Id": String(requesterId),
+      Origin: window.location.origin,
+      "X-CSRF-Token": csrfToken,
     },
+    credentials: "include",
     body: JSON.stringify(input),
   });
   const payload = (await response.json()) as {
@@ -337,6 +322,59 @@ export async function createTicket(
   return payload.data;
 }
 
+export type UserRole = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+
+export interface CurrentUser {
+  id: number;
+  displayName: string;
+  email: string;
+  role: UserRole;
+  isActive: true;
+  mustChangePassword: boolean;
+  sessionExpiresAt: string;
+  csrfToken: string;
+}
+
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  fields?: Record<string, string>;
+  retryAfter?: string | null;
+
+  constructor(status: number, payload: { error?: { code?: string; message?: string; fields?: Record<string, string> } }, retryAfter?: string | null) {
+    super(payload.error?.message ?? "The request could not be completed.");
+    this.status = status;
+    this.code = payload.error?.code;
+    this.fields = payload.error?.fields;
+    this.retryAfter = retryAfter;
+  }
+}
+
+async function authRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    credentials: "include",
+    ...options,
+    headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers },
+  });
+  const payload = response.status === 204 ? {} : await response.json() as { data?: T; error?: { code?: string; message?: string; fields?: Record<string, string> } };
+  if (!response.ok || (response.status !== 204 && !payload.data)) throw new ApiError(response.status, payload, response.headers.get("Retry-After"));
+  return payload.data as T;
+}
+
+export function getCurrentUser(): Promise<CurrentUser> { return authRequest<CurrentUser>("/api/auth/me"); }
+
+export function login(email: string, password: string): Promise<CurrentUser> {
+  return authRequest<CurrentUser>("/api/auth/login", { method: "POST", headers: { Origin: window.location.origin }, body: JSON.stringify({ email, password }) });
+}
+
+export function changePassword(currentPassword: string, newPassword: string, csrfToken: string): Promise<CurrentUser> {
+  return authRequest<CurrentUser>("/api/auth/change-password", { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify({ currentPassword, newPassword }) });
+}
+
+export function logout(csrfToken: string): Promise<void> {
+  return authRequest<void>("/api/auth/logout", { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken } });
+}
+
 function isCategory(value: unknown): value is Category {
   return (
     typeof value === "object" &&
@@ -346,12 +384,130 @@ function isCategory(value: unknown): value is Category {
   );
 }
 
-function isRequester(value: unknown): value is DevelopmentRequester {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as DevelopmentRequester).id === "number" &&
-    typeof (value as DevelopmentRequester).displayName === "string" &&
-    typeof (value as DevelopmentRequester).email === "string"
-  );
+export function getTicketComments(ticketId: string): Promise<PublicComment[]> {
+  return authRequest<PublicComment[]>(`/api/tickets/${ticketId}/comments`);
+}
+
+export function postTicketComment(ticketId: string, content: string, csrfToken: string): Promise<PublicComment> {
+  return authRequest<PublicComment>(`/api/tickets/${ticketId}/comments`, { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify({ content }) });
+}
+
+export function markProblemAppearsResolved(ticketId: string, version: number, csrfToken: string): Promise<TicketDetail> {
+  return authRequest<TicketDetail>(`/api/tickets/${ticketId}/problem-appears-resolved`, { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify({ version }) });
+}
+
+export function fetchTicketDetail(ticketId: string): Promise<TicketDetail> {
+  return authRequest<TicketDetail>(`/api/tickets/${ticketId}`);
+}
+
+export interface StaffQueueTicket {
+  id: string;
+  ticketNumber: string;
+  summary: string;
+  requester: { id: number; displayName: string };
+  category: Category;
+  relatedSystem: RelatedSystem;
+  requestedPriority: RequestedPriority;
+  itPriority: RequestedPriority;
+  currentStatus: TicketStatus;
+  owner: { id: number; displayName: string; role: UserRole } | null;
+  requesterResolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface StaffQueueResponse {
+  data: StaffQueueTicket[];
+  pagination: TicketListResponse["pagination"];
+  counts: { total: number; unassigned: number; mine: number };
+}
+
+export async function getStaffQueue(search: string): Promise<StaffQueueResponse> {
+  const response = await fetch(`${API_URL}/api/staff/tickets${search}`, { credentials: "include" });
+  const payload = await response.json() as Partial<StaffQueueResponse> & { error?: { code?: string; message?: string } };
+  if (!response.ok || !payload.data || !payload.pagination || !payload.counts) throw new ApiError(response.status, payload);
+  return payload as StaffQueueResponse;
+}
+
+export interface PersonRef { id: number; displayName: string; role?: UserRole }
+
+export interface StaffTicketDetail {
+  id: string;
+  ticketNumber: string;
+  summary: string;
+  description: string;
+  requester: PersonRef;
+  category: Category;
+  relatedSystem: RelatedSystem;
+  requestedPriority: RequestedPriority;
+  itPriority: RequestedPriority;
+  currentStatus: TicketStatus;
+  owner: PersonRef | null;
+  requesterResolvedAt: string | null;
+  requesterResolvedBy: PersonRef | null;
+  lastStatusChangedAt: string | null;
+  lastStatusChangedBy: PersonRef | null;
+  lastOwnerChangedAt: string | null;
+  lastOwnerChangedBy: PersonRef | null;
+  lastPriorityChangedAt: string | null;
+  lastPriorityChangedBy: PersonRef | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+  attachments: TicketAttachmentMetadata[];
+  publicComments?: PublicComment[];
+  internalNotes?: PublicComment[];
+}
+
+export function getStaffTicketDetail(ticketId: string): Promise<StaffTicketDetail> {
+  return authRequest<StaffTicketDetail>(`/api/staff/tickets/${ticketId}`);
+}
+
+export function getAssignees(): Promise<PersonRef[]> {
+  return authRequest<PersonRef[]>("/api/staff/assignees");
+}
+
+export function staffMutation(path: string, method: "POST" | "PATCH", body: Record<string, unknown>, csrfToken: string): Promise<StaffTicketDetail> {
+  return authRequest<StaffTicketDetail>(`/api/staff/tickets/${path}`, { method, headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify(body) });
+}
+
+export function postInternalNote(ticketId: string, content: string, csrfToken: string): Promise<PublicComment> {
+  return authRequest<PublicComment>(`/api/staff/tickets/${ticketId}/internal-notes`, { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify({ content }) });
+}
+
+export interface UserSummary {
+  id: number;
+  displayName: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function adminHeaders(csrfToken: string) {
+  return { Origin: window.location.origin, "X-CSRF-Token": csrfToken };
+}
+
+export function listUsers(search: string, role: string): Promise<UserSummary[]> {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  if (role) params.set("role", role);
+  const text = params.toString();
+  return authRequest<UserSummary[]>(`/api/admin/users${text ? `?${text}` : ""}`);
+}
+
+export function createUser(input: { displayName: string; email: string; role: UserRole; isActive: boolean; initialPassword: string }, csrfToken: string): Promise<UserSummary> {
+  return authRequest<UserSummary>("/api/admin/users", { method: "POST", headers: adminHeaders(csrfToken), body: JSON.stringify(input) });
+}
+
+export function updateUser(id: number, input: { displayName: string; email: string; role: UserRole; isActive: boolean; version: number }, csrfToken: string): Promise<UserSummary> {
+  return authRequest<UserSummary>(`/api/admin/users/${id}`, { method: "PATCH", headers: adminHeaders(csrfToken), body: JSON.stringify(input) });
+}
+
+export function setInitialPassword(id: number, initialPassword: string, csrfToken: string): Promise<void> {
+  return authRequest<void>(`/api/admin/users/${id}/initial-password`, { method: "POST", headers: adminHeaders(csrfToken), body: JSON.stringify({ initialPassword }) });
 }

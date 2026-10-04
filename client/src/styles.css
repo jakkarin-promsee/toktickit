@@ -66,6 +66,16 @@ body {
   box-shadow: 0 2px 8px rgb(23 53 42 / 8%);
 }
 
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.auth-card {
+  width: min(100%, 480px);
+}
+
 .required-marker {
   color: var(--danger);
 }
@@ -99,6 +109,13 @@ body {
 }
 
 @media (max-width: 767px) {
+  .auth-page {
+    align-items: start;
+  }
+
+  .auth-card {
+    padding: 1.25rem !important;
+  }
   .app-menu-toggle {
     display: inline-block;
   }
@@ -129,5 +146,509 @@ body {
   .app-header .requester-identity {
     order: 3;
     width: 100%;
+  }
+}
+
+.comment-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.requester-detail dd {
+  overflow-wrap: anywhere;
+}
+
+.queue-summary {
+  overflow-wrap: anywhere;
+}
+
+/* Only free text may wrap anywhere; identifiers, headers, and dates keep their words intact. */
+.queue-table th,
+.queue-table td:first-child,
+.queue-table td:last-child {
+  white-space: nowrap;
+}
+
+.queue-table thead th {
+  vertical-align: middle;
+}
+
+/* Multi-word statuses may wrap inside the table cell; the full text stays visible. */
+.queue-table .badge-status {
+  white-space: normal;
+  text-align: left;
+  max-width: 7.5rem;
+}
+
+/* Requested and IT Priority stack inside the Priority column so the table fits tablet widths. */
+.queue-table .badge-priority {
+  display: block;
+  width: fit-content;
+  margin: 0 0 0.25rem;
+}
+
+.queue-table th .btn-link {
+  font-weight: inherit;
+  text-decoration: none;
+}
+
+:root {
+  --note: #fff8e1;
+  --note-border: #c58a00;
+}
+
+.note-surface {
+  background: var(--note);
+  border: 1px solid var(--note-border);
+  border-radius: 8px;
+}
+
+.readonly-fields dd {
+  background: var(--readonly);
+  border-radius: 4px;
+  padding: 4px 8px;
+  overflow-wrap: anywhere;
+}
+
+.user-table {
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------
+   Lab 3 Zen Green consistency (Issue #40)
+   Bootstrap defaults are blue; these rules map them onto the approved
+   tokens so every Lab 3 screen shares one visual system.
+   ------------------------------------------------------------------ */
+
+:root[data-theme="zen-green"] {
+  --green-800: #004d2b;
+  --bs-link-color: #006b3c;
+  --bs-link-color-rgb: 0, 107, 60;
+  --bs-link-hover-color: #004d2b;
+  --bs-link-hover-color-rgb: 0, 77, 43;
+  --bs-body-color: #17352a;
+  --bs-focus-ring-color: rgb(11 122 70 / 25%);
+}
+
+.container {
+  max-width: 1200px;
+}
+
+.btn-primary,
+.btn-success {
+  --bs-btn-bg: var(--green-700);
+  --bs-btn-border-color: var(--green-700);
+  --bs-btn-hover-bg: var(--green-800);
+  --bs-btn-hover-border-color: var(--green-800);
+  --bs-btn-active-bg: var(--green-800);
+  --bs-btn-active-border-color: var(--green-800);
+  --bs-btn-disabled-bg: var(--green-700);
+  --bs-btn-disabled-border-color: var(--green-700);
+  --bs-btn-focus-shadow-rgb: 0, 107, 60;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--green-700);
+  --bs-btn-border-color: var(--green-700);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--green-700);
+  --bs-btn-hover-border-color: var(--green-700);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--green-800);
+  --bs-btn-active-border-color: var(--green-800);
+  --bs-btn-disabled-color: var(--green-700);
+  --bs-btn-disabled-border-color: var(--green-700);
+  --bs-btn-focus-shadow-rgb: 0, 107, 60;
+}
+
+.btn-outline-danger {
+  --bs-btn-color: var(--danger);
+  --bs-btn-border-color: var(--danger);
+  --bs-btn-hover-bg: var(--danger);
+  --bs-btn-hover-border-color: var(--danger);
+  --bs-btn-active-bg: var(--danger);
+}
+
+.btn-danger {
+  --bs-btn-bg: var(--danger);
+  --bs-btn-border-color: var(--danger);
+  --bs-btn-hover-bg: #7c1616;
+  --bs-btn-hover-border-color: #7c1616;
+}
+
+/* Internal Note actions use the amber note palette so they cannot be mistaken for public posting. */
+.btn-note {
+  --bs-btn-color: #3d2a00;
+  --bs-btn-bg: #f4c35a;
+  --bs-btn-border-color: var(--note-border);
+  --bs-btn-hover-color: #3d2a00;
+  --bs-btn-hover-bg: #e8b13a;
+  --bs-btn-hover-border-color: var(--note-border);
+  --bs-btn-active-color: #3d2a00;
+  --bs-btn-active-bg: #e8b13a;
+  --bs-btn-disabled-color: #3d2a00;
+  --bs-btn-disabled-bg: #f4c35a;
+  --bs-btn-disabled-border-color: var(--note-border);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: var(--green-600);
+  box-shadow: 0 0 0 0.2rem rgb(11 122 70 / 25%);
+}
+
+.form-check-input:checked {
+  background-color: var(--green-700);
+  border-color: var(--green-700);
+}
+
+.form-check-input {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+textarea.form-control {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Editable controls stay white; disabled and read-only values use the readonly token. */
+.form-control:disabled,
+.form-select:disabled {
+  background-color: var(--readonly);
+  color: var(--muted);
+}
+
+.form-label {
+  font-weight: 600;
+}
+
+/* Required marker: visible asterisk with empty alternative text, so accessible names stay "Email" and aria-required announces the requirement. */
+.form-label.required::after {
+  content: " *" / "";
+  color: var(--danger);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.field-error::before {
+  content: "⚠ " / "";
+}
+
+.field-mode {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--readonly);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.field-mode-editable {
+  background: var(--surface);
+  border-color: var(--green-600);
+  color: var(--green-700);
+}
+
+.readonly-inline {
+  background: var(--readonly);
+  border-radius: 4px;
+  padding: 0 6px;
+}
+
+/* Badges: full text always present; tints are a secondary cue only. */
+/* Short badges stay on one line; only the free-text owner badge may wrap. */
+.badge {
+  font-weight: 600;
+  border: 1px solid rgb(23 53 42 / 12%);
+}
+
+.badge-owner {
+  white-space: normal;
+  text-align: left;
+}
+
+.badge-status-new { background: #eef1f0; color: #17352a; }
+.badge-status-open { background: #e3eefb; color: #0b3d77; }
+.badge-status-in-progress { background: #dff3e7; color: #0b5a33; }
+.badge-status-waiting-for-requester { background: #fff1cc; color: #5c4000; }
+.badge-status-resolved { background: #dcf3f0; color: #0b504b; }
+.badge-status-closed { background: #e6e9ec; color: #343a40; }
+.badge-status-reopened { background: #eee6fb; color: #4b2a85; }
+.badge-status-cancelled { background: #fbe5e5; color: #7c1616; }
+
+.badge-priority-low { background: #eef1f0; color: #2f3d38; }
+.badge-priority-medium { background: #fff1cc; color: #5c4000; }
+.badge-priority-high { background: #fbe5e5; color: #7c1616; }
+
+.badge-role-requester { background: #dff3e7; color: #0b5a33; }
+.badge-role-it-staff { background: #e3eefb; color: #0b3d77; }
+.badge-role-administrator { background: #eee6fb; color: #4b2a85; }
+
+.badge-account-active { background: #dff3e7; color: #0b5a33; }
+.badge-account-inactive { background: #e6e9ec; color: #343a40; }
+.badge-account-password-change-required { background: #fff1cc; color: #5c4000; }
+
+.badge-owner { background: var(--green-050); color: var(--text); }
+.badge-owner-none { background: #e6e9ec; color: #343a40; font-style: italic; }
+
+/* Application shell */
+/* Hidden by Bootstrap's visually-hidden-focusable until it receives keyboard focus. */
+.skip-link:focus {
+  position: absolute;
+  top: 0.5rem;
+  left: 1rem;
+  z-index: 1100;
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  color: var(--green-700);
+  font-weight: 700;
+}
+
+.app-header {
+  padding: 0.5rem 0;
+}
+
+.app-header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+}
+
+.app-header :focus-visible {
+  outline-color: #ffffff;
+}
+
+.app-brand {
+  color: #ffffff;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.app-brand:hover {
+  color: #ffffff;
+}
+
+.app-nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.app-nav-link:hover {
+  color: #ffffff;
+  background: rgb(255 255 255 / 12%);
+}
+
+.app-nav-link[aria-current="page"] {
+  background: rgb(255 255 255 / 18%);
+  box-shadow: inset 0 -3px 0 #ffffff;
+  font-weight: 700;
+}
+
+.app-identity {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.app-identity-name {
+  font-weight: 600;
+}
+
+.badge-on-dark {
+  border-color: rgb(255 255 255 / 60%);
+}
+
+.app-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.app-actions .btn {
+  min-height: 44px;
+}
+
+/* Modal dialogs */
+.zen-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(23 53 42 / 45%);
+  overflow-y: auto;
+}
+
+.zen-dialog {
+  width: min(100%, 520px);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+/* Staff Ticket Detail communication tabs: driven through Bootstrap button variables so hover and focus never repaint the wrong tab. The selected tab is bold with an inset bar, so selection does not rely on color alone. */
+.comm-tab {
+  transition: none;
+  --bs-btn-color: var(--green-700);
+  --bs-btn-bg: var(--surface);
+  --bs-btn-border-color: var(--green-700);
+  --bs-btn-hover-color: var(--green-800);
+  --bs-btn-hover-bg: var(--green-050);
+  --bs-btn-hover-border-color: var(--green-700);
+  --bs-btn-active-color: var(--green-800);
+  --bs-btn-active-bg: var(--green-050);
+  --bs-btn-active-border-color: var(--green-700);
+}
+
+.comm-tab.is-active {
+  --bs-btn-color: #ffffff;
+  --bs-btn-bg: var(--green-700);
+  --bs-btn-hover-color: #ffffff;
+  --bs-btn-hover-bg: var(--green-700);
+  --bs-btn-active-color: #ffffff;
+  --bs-btn-active-bg: var(--green-700);
+  font-weight: 700;
+  box-shadow: inset 0 -4px 0 var(--green-800);
+}
+
+.comm-tab-internal {
+  --bs-btn-color: #5c4000;
+  --bs-btn-border-color: var(--note-border);
+  --bs-btn-hover-color: #3d2a00;
+  --bs-btn-hover-bg: var(--note);
+  --bs-btn-hover-border-color: var(--note-border);
+  --bs-btn-active-color: #3d2a00;
+  --bs-btn-active-bg: var(--note);
+  --bs-btn-active-border-color: var(--note-border);
+}
+
+.comm-tab-internal.is-active {
+  --bs-btn-color: #3d2a00;
+  --bs-btn-bg: #f4c35a;
+  --bs-btn-hover-color: #3d2a00;
+  --bs-btn-hover-bg: #f4c35a;
+  --bs-btn-active-color: #3d2a00;
+  --bs-btn-active-bg: #f4c35a;
+  box-shadow: inset 0 -4px 0 #7a5400;
+}
+
+.note-surface {
+  border-left: 6px solid var(--note-border);
+}
+
+.note-audience {
+  font-weight: 600;
+  color: #5c4000;
+}
+
+.readonly-fields dt {
+  margin-top: 0.5rem;
+}
+
+.queue-count strong {
+  font-size: 1.25rem;
+}
+
+.queue-card,
+.user-cards .card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  overflow-wrap: anywhere;
+}
+
+.ticket-link {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.zen-table {
+  border: 1px solid var(--border);
+}
+
+.zen-table thead th {
+  background: var(--green-050);
+}
+
+@media (max-width: 767px) {
+  .app-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+    min-height: 44px;
+    order: 1;
+  }
+
+  .app-identity {
+    order: 2;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .app-collapsible {
+    display: none;
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .app-actions {
+    order: 4;
+  }
+
+  .app-collapsible.is-open {
+    display: flex;
+  }
+
+  .app-nav-links {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .app-nav-link {
+    width: 100%;
+  }
+
+  .app-actions .btn,
+  .user-panel .btn,
+  .zen-dialog .btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (min-width: 768px) {
+  .app-menu-toggle {
+    display: none;
   }
 }
