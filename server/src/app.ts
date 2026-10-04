@@ -113,6 +113,27 @@ async function requireSession(req: Request, res: Response, allowPasswordChange =
   }
 }
 
+function sendForbidden(res: Response) {
+  sendAuthError(res, 403, "FORBIDDEN", "You do not have permission to perform this action.");
+}
+
+async function requireRole(req: Request, res: Response, roles: AuthSession["user"]["role"][], allowPasswordChange = false): Promise<AuthSession | null> {
+  const session = await requireSession(req, res, allowPasswordChange);
+  if (!session) return null;
+  if (!roles.includes(session.user.role)) {
+    sendForbidden(res);
+    return null;
+  }
+  return session;
+}
+
+async function requireRequester(req: Request, res: Response, unsafe = false): Promise<AuthSession | null> {
+  const session = await requireRole(req, res, ["REQUESTER"]);
+  if (!session) return null;
+  if (unsafe && !originAndCsrfValid(req, res, session)) return null;
+  return session;
+}
+
 function csrfValid(req: Request, session: AuthSession): boolean {
   const supplied = req.get("X-CSRF-Token");
   return Boolean(supplied && supplied.length === session.csrfToken.length && crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(session.csrfToken)));
@@ -254,20 +275,6 @@ app.get("/api/app", async (req: Request, res: Response) => {
   if (session) res.status(200).json({ data: { role: session.user.role } });
 });
 
-app.get("/api/requesters", async (_req: Request, res: Response) => {
-  try {
-    const requesters = await getPrisma().user.findMany({
-      where: { role: "REQUESTER", isActive: true },
-      orderBy: [{ displayName: "asc" }, { id: "asc" }],
-      select: { id: true, displayName: true, email: true },
-    });
-    res.status(200).json({ data: requesters });
-  } catch (error) {
-    console.error("GET /api/requesters failed:", error);
-    res.status(503).json({ error: { code: "DEPENDENCY_UNAVAILABLE", message: "Development Requesters are temporarily unavailable." } });
-  }
-});
-
 const attachmentStorage = path.resolve(process.env.ATTACHMENT_STORAGE ?? "storage/attachments");
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -386,36 +393,22 @@ async function ownedAttachment(
   });
 }
 
-async function removeStagedFile(storagePath: string) {
-  await fs.rm(storagePath, { force: true }).catch(() => undefined);
+async function readableTicket(ticketId: string, session: AuthSession) {
+  return getPrisma().ticket.findFirst({
+    where: session.user.role === "REQUESTER" ? { id: ticketId, submittedByUserId: session.user.id } : { id: ticketId },
+    select: { id: true },
+  });
 }
 
-async function getActiveRequester(req: Request, res: Response) {
-  const rawId = req.get("X-Requester-Id");
-  if (!rawId || !/^[1-9]\d*$/.test(rawId)) {
-    sendError(
-      res,
-      400,
-      "INVALID_REQUESTER_CONTEXT",
-      "A valid Development Requester context is required.",
-    );
-    return null;
-  }
-  try {
-    const requester = await getPrisma().user.findFirst({
-      where: { id: Number(rawId), role: "REQUESTER", isActive: true },
-      select: { id: true, displayName: true, email: true },
-    });
-    if (!requester) {
-      sendError(res, 400, "INVALID_REQUESTER_CONTEXT", "A valid Development Requester context is required.");
-      return null;
-    }
-    return requester;
-  } catch (error) {
-    console.error("Requester context lookup failed:", error);
-    sendError(res, 503, "DEPENDENCY_UNAVAILABLE", "The database is temporarily unavailable.");
-    return null;
-  }
+async function readableAttachment(attachmentId: string, session: AuthSession) {
+  return getPrisma().attachment.findFirst({
+    where: session.user.role === "REQUESTER" ? { id: attachmentId, ticket: { submittedByUserId: session.user.id } } : { id: attachmentId },
+    include: attachmentIncludes,
+  });
+}
+
+async function removeStagedFile(storagePath: string) {
+  await fs.rm(storagePath, { force: true }).catch(() => undefined);
 }
 
 function isUniqueConstraintError(error: unknown): boolean {
@@ -475,8 +468,8 @@ async function createTicket(
 }
 
 app.post("/api/tickets", async (req: Request, res: Response) => {
-  const requester = await getActiveRequester(req, res);
-  if (!requester) return;
+  const session = await requireRequester(req, res, true);
+  if (!session) return;
 
   const validation = validateCreateTicketInput(req.body);
   if (!validation.ok) {
@@ -516,7 +509,7 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
       return;
     }
 
-    const ticket = await createTicket(requester.id, validation.value);
+    const ticket = await createTicket(session.user.id, validation.value);
     res.status(201).json({
       data: {
         id: ticket.id,
@@ -561,8 +554,8 @@ app.post(
   "/api/tickets/:ticketId/attachments",
   uploadMiddleware,
   async (req: Request, res: Response) => {
-    const requester = await getActiveRequester(req, res);
-    if (!requester) return;
+    const session = await requireRequester(req, res, true);
+    if (!session) return;
     const { ticketId } = req.params;
     if (!UUID_PATTERN.test(ticketId)) {
       sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
@@ -586,7 +579,7 @@ app.post(
 
     const prisma = getPrisma();
     const ticket = await prisma.ticket.findFirst({
-      where: { id: ticketId, submittedByUserId: requester.id },
+      where: { id: ticketId, submittedByUserId: session.user.id },
       select: { id: true },
     });
     if (!ticket) {
@@ -623,7 +616,7 @@ app.post(
             mimeType: validation.value.mimeType,
             sizeBytes: validation.value.sizeBytes,
             sha256: crypto.createHash("sha256").update(req.file!.buffer).digest("hex"),
-            uploadedByUserId: requester.id,
+            uploadedByUserId: session.user.id,
           },
           include: attachmentIncludes,
         });
@@ -648,18 +641,15 @@ app.post(
 );
 
 app.get("/api/tickets/:ticketId/attachments", async (req: Request, res: Response) => {
-  const requester = await getActiveRequester(req, res);
-  if (!requester) return;
+  const session = await requireSession(req, res);
+  if (!session) return;
   const { ticketId } = req.params;
   if (!UUID_PATTERN.test(ticketId)) {
     sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
     return;
   }
   try {
-    const ticket = await getPrisma().ticket.findFirst({
-      where: { id: ticketId, submittedByUserId: requester.id },
-      select: { id: true },
-    });
+    const ticket = await readableTicket(ticketId, session);
     if (!ticket) {
       sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
       return;
@@ -684,8 +674,8 @@ app.get("/api/tickets/:ticketId/attachments", async (req: Request, res: Response
 });
 
 app.get("/api/attachments/:attachmentId/download", async (req: Request, res: Response) => {
-  const requester = await getActiveRequester(req, res);
-  if (!requester) return;
+  const session = await requireSession(req, res);
+  if (!session) return;
   const { attachmentId } = req.params;
   if (!UUID_PATTERN.test(attachmentId)) {
     sendError(res, 400, "INVALID_ATTACHMENT_ID", "Attachment ID must be a valid UUID.");
@@ -696,7 +686,7 @@ app.get("/api/attachments/:attachmentId/download", async (req: Request, res: Res
     return;
   }
   try {
-    const attachment = await ownedAttachment(attachmentId, requester.id);
+    const attachment = await readableAttachment(attachmentId, session);
     if (!attachment) {
       attachmentNotFound(res);
       return;
@@ -732,8 +722,8 @@ app.get("/api/attachments/:attachmentId/download", async (req: Request, res: Res
 });
 
 app.delete("/api/attachments/:attachmentId", async (req: Request, res: Response) => {
-  const requester = await getActiveRequester(req, res);
-  if (!requester) return;
+  const session = await requireRequester(req, res, true);
+  if (!session) return;
   const { attachmentId } = req.params;
   if (!UUID_PATTERN.test(attachmentId)) {
     sendError(res, 400, "INVALID_ATTACHMENT_ID", "Attachment ID must be a valid UUID.");
@@ -745,7 +735,7 @@ app.delete("/api/attachments/:attachmentId", async (req: Request, res: Response)
     return;
   }
   try {
-    const attachment = await ownedAttachment(attachmentId, requester.id);
+    const attachment = await ownedAttachment(attachmentId, session.user.id);
     if (!attachment) {
       attachmentNotFound(res);
       return;
@@ -758,7 +748,7 @@ app.delete("/api/attachments/:attachmentId", async (req: Request, res: Response)
       where: { id: attachmentId },
       data: {
         removedAt: new Date(),
-        removedByUserId: requester.id,
+        removedByUserId: session.user.id,
         removalReason: req.body.reason.trim(),
       },
       include: attachmentIncludes,
@@ -771,8 +761,8 @@ app.delete("/api/attachments/:attachmentId", async (req: Request, res: Response)
 });
 
 app.get("/api/tickets/:ticketId", async (req: Request, res: Response) => {
-  const requester = await getActiveRequester(req, res);
-  if (!requester) return;
+  const session = await requireRequester(req, res);
+  if (!session) return;
 
   const { ticketId } = req.params;
   if (!UUID_PATTERN.test(ticketId)) {
@@ -784,7 +774,7 @@ app.get("/api/tickets/:ticketId", async (req: Request, res: Response) => {
     const ticket = await getPrisma().ticket.findFirst({
       where: {
         id: ticketId,
-        submittedByUserId: requester.id,
+        submittedByUserId: session.user.id,
       },
       include: {
         submittedBy: { select: { id: true, displayName: true } },
@@ -858,8 +848,8 @@ app.get("/api/tickets/:ticketId", async (req: Request, res: Response) => {
 });
 
 app.get("/api/tickets", async (req: Request, res: Response) => {
-  const requester = await getActiveRequester(req, res);
-  if (!requester) return;
+  const session = await requireRequester(req, res);
+  if (!session) return;
 
   let query;
   try {
@@ -876,7 +866,7 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
 
   try {
     const where: Prisma.TicketWhereInput = {
-      submittedByUserId: requester.id,
+      submittedByUserId: session.user.id,
       ...(query.search
         ? {
             OR: [
@@ -945,6 +935,27 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
         : "Tickets could not be loaded. Please try again.",
     );
   }
+});
+
+// These endpoint families are implemented by later Lab 3 issues. Keeping the
+// authorization boundary here makes direct calls fail safely now, rather than
+// relying on the client shell to hide unfinished destinations.
+app.all("/api/staff/assignees", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF"]);
+  if (!session) return;
+  sendError(res, 501, "NOT_IMPLEMENTED", "This Staff capability is not available yet.");
+});
+
+app.all("/api/staff/*", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF", "ADMINISTRATOR"]);
+  if (!session) return;
+  sendError(res, 501, "NOT_IMPLEMENTED", "This Staff capability is not available yet.");
+});
+
+app.all("/api/admin/*", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["ADMINISTRATOR"]);
+  if (!session) return;
+  sendError(res, 501, "NOT_IMPLEMENTED", "This Administrator capability is not available yet.");
 });
 
 export default app;
