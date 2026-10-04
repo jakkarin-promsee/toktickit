@@ -1,6 +1,6 @@
 # Lab 3 Test Plan
 
-Status: Test DD contract created before Lab 3 production implementation; automated unit, API/integration, security, migration, regression, UI component, and UI style results recorded by Issue #38; browser E2E results recorded by Issue #39; responsive, accessibility, and visual evidence recorded by Issue #40. Every planned row now has a recorded result.
+Status: Test DD contract created before Lab 3 production implementation; automated unit, API/integration, security, migration, regression, UI component, and UI style results recorded by Issue #38; browser E2E results recorded by Issue #39; responsive, accessibility, and visual evidence recorded by Issue #40; final results rerun on `main` after release PR #54 (Issue #41). Every planned row has a recorded result.
 
 Last updated: 4 October 2026
 
@@ -237,6 +237,8 @@ The server suite needs the local PostgreSQL from the README; `TEST_DATABASE_URL`
 | Lab 1/Lab 2 regression server files | Pass: 3 Lab 1 files with 4 tests and 12 Lab 2 files with 44 tests | Same run |
 | Lab 3 client files | Pass: `AppShell` 6, `ChangePassword` 6, `Login` 8, `RequesterCreateTicket` 3, `RequesterTicketDetail` 10, `StaffTicketDetail` 11, `StaffTicketQueue` 10, `UserManagement` 13, `ui-components` 3, `zen-green-style` 10 | Same run |
 | Production builds | Pass | `npm --prefix server run build`; `npm --prefix client run build` on 4 October 2026 |
+| Final `main` after release PR #54 | Pass: server 28 files / 163 tests and client 10 files / 80 tests in both runs; E2E, responsive, and accessibility 58 tests in both runs; visual 9 tests; both production builds | `npm run test:lab3:rerun`, `npm run test:e2e:rerun`, `npm run test:visual`, and both builds on `main` (merge commit `528e278`) on 4 October 2026 |
+| Release-candidate check on `lab3-staging` | First run found 2 client failures in `zen-green-style.test.tsx` caused by CRLF checkout line endings; fixed in PR #53, then the full suite passed | Same commands on `lab3-staging` before and after PR #53 |
 | Skipped/focused tests | None | `grep` command in section 7 returns no matches |
 | Browser E2E, responsive, and accessibility | Pass: 6 files, 58 tests, run 1 and run 2 (no retries, no flaky) | `npm run test:e2e:rerun` on 4 October 2026 |
 | E2E files | Pass: `authentication.spec.ts` 5, `requester-ticket-flow.spec.ts` 3, `staff-ticket-flow.spec.ts` 6, `user-administration.spec.ts` 6, `responsive.spec.ts` 28, `accessibility.spec.ts` 10 | Same run |

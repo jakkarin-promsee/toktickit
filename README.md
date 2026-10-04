@@ -172,6 +172,6 @@ toktickit/
 
 ## Git workflow
 
-Each Lab 3 Issue was implemented on its own `feature/<issue>-*` branch and merged into `lab3-staging` through a peer-reviewed PR: Issues #30–#39 entered staging through PRs #42–#51, and Issue #40 follows the same flow. Issue #41 releases `lab3-staging` to `main` through a reviewed release PR. No feature development happens directly on `main` or `lab3-staging`. Review evidence is recorded in [`docs/lab-03/reviewer.md`](docs/lab-03/reviewer.md).
+Each Lab 3 Issue was implemented on its own `feature/<issue>-*` branch and merged into `lab3-staging` through a peer-reviewed PR: Issues #30–#40 entered staging through PRs #42–#52, and the release check's fix went through PR #53. Issue #41 released `lab3-staging` to `main` through reviewed release PR #54. No feature development happens directly on `main` or `lab3-staging`. Review evidence is recorded in [`docs/lab-03/reviewer.md`](docs/lab-03/reviewer.md).
 
 Lab 2 followed the same pattern: feature branches `feature/10-*` through `feature/17-*` targeted `lab2-staging`, and Issue #18 released it to `main` via PR #27.

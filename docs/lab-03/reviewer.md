@@ -1,6 +1,6 @@
 # Lab 3 — Peer Review Record
 
-Status: Issues #30–#40 are complete. Feature PRs #42–#52 were peer-approved and merged into `lab3-staging`, and the release-check fix #53 follows the same flow. The Issue #41 release PR from `lab3-staging` to `main` is added below once it is reviewed. Every link points to the review, line comment, or PR on GitHub.
+Status: Issues #30–#41 are complete. Feature PRs #42–#52 and the release-check fix #53 were peer-approved and merged into `lab3-staging`, and release PR #54 from `lab3-staging` to `main` was approved and merged on 4 October 2026.
 
 | Role              | Full Name         | Student ID  | GitHub username                                          |
 | ----------------- | ----------------- | ----------- | -------------------------------------------------------- |
@@ -26,7 +26,8 @@ Status: Issues #30–#40 are complete. Feature PRs #42–#52 were peer-approved 
 | [#50](https://github.com/jakkarin-promsee/toktickit/pull/50)     | #38   | Automated test coverage and traceability                                      | `feature/38-lab3-test-traceability`        | [Review](https://github.com/jakkarin-promsee/toktickit/pull/50#pullrequestreview-5403967191) | ✅ Approved and merged |
 | [#51](https://github.com/jakkarin-promsee/toktickit/pull/51)     | #39   | End-to-end workflows                                                          | `feature/39-lab3-e2e`                      | [Review](https://github.com/jakkarin-promsee/toktickit/pull/51#pullrequestreview-5404021900) | ✅ Approved and merged |
 | [#52](https://github.com/jakkarin-promsee/toktickit/pull/52) | #40   | Responsive, accessibility, Zen Green visual evidence, and Lab 3 documentation | `feature/40-lab3-visual-evidence`          | [Review](https://github.com/jakkarin-promsee/toktickit/pull/52#pullrequestreview-5405192308) | ✅ Approved and merged |
-| [#TODO](https://github.com/jakkarin-promsee/toktickit/pull/TODO) | #41   | Release Lab 3 from lab3-staging to main                                       | `lab3-staging`                             | [Review](https://github.com/jakkarin-promsee/toktickit/pull/TODO)                            | ⏳ TODO after review   |
+| [#53](https://github.com/jakkarin-promsee/toktickit/pull/53) | #41 | Release check: style test independent of line endings, reviewer record update | `fix/41-style-test-line-endings` | [Review](https://github.com/jakkarin-promsee/toktickit/pull/53#pullrequestreview-5405345852) | ✅ Approved and merged |
+| [#54](https://github.com/jakkarin-promsee/toktickit/pull/54) | #41 | Release Lab 3 from lab3-staging to main | `lab3-staging` | [Review](https://github.com/jakkarin-promsee/toktickit/pull/54#pullrequestreview-5405386732) | ✅ Approved and merged |
 
 ### PRs I reviewed — authored by my partner
 
@@ -43,6 +44,8 @@ Status: Issues #30–#40 are complete. Feature PRs #42–#52 were peer-approved 
 | [#55](https://github.com/UsernameJillzaza/toktickit/pull/55)     | #45   | Lab 3 Playwright suite, responsive checks, and screenshot evidence       | `feature/45-e2e-evidence`         | [Review](https://github.com/UsernameJillzaza/toktickit/pull/55#pullrequestreview-5403693192) | ✅ Approved and merged |
 | [#56](https://github.com/UsernameJillzaza/toktickit/pull/56) | #46   | Lab 3 documentation: final test results, visual checklist, AI use, reviewer, README | `feature/46-docs` | [Review](https://github.com/UsernameJillzaza/toktickit/pull/56#pullrequestreview-5405174227) | ✅ Approved and merged |
 | [#57](https://github.com/UsernameJillzaza/toktickit/pull/57) | Docs  | Docs follow-up: record open review findings before the Lab 3 release | `docs/lab3-review-followups` | [Review](https://github.com/UsernameJillzaza/toktickit/pull/57#pullrequestreview-5405200151) | ✅ Approved and merged |
+| [#58](https://github.com/UsernameJillzaza/toktickit/pull/58) | Docs | Docs follow-up: record the final test run and fix review notes from #57 | `docs/lab3-final-results` | [Review](https://github.com/UsernameJillzaza/toktickit/pull/58#pullrequestreview-5405386683) | ✅ Approved and merged |
+| [#59](https://github.com/UsernameJillzaza/toktickit/pull/59) | Release | Release Lab 3: users, roles, IT Staff ticketing, and admin screens | `lab3-staging` → `main` | [Review](https://github.com/UsernameJillzaza/toktickit/pull/59#pullrequestreview-5405428615) | ✅ Approved and merged |
 
 ## Notable comments, responses, and resolutions
 
@@ -51,7 +54,7 @@ Every review on my Lab 3 PRs included a top-level summary, a checklist of what t
 ### Question on PR #42: two ways to read Attachments
 
 - **Reviewer comment:** On `api-spec.md`, my partner noticed that Ticket Detail embeds `attachments: []` while a standalone `GET /api/tickets/:ticketId/attachments` returns the same metadata, and asked whether the standalone endpoint exists so the UI can refresh only the Attachment list after an upload or removal, or whether it is leftover overlap. The comment was marked non-blocking. [Read the line comment](https://github.com/jakkarin-promsee/toktickit/pull/42#discussion_r4175439134).
-- **My response:** TODO — reply in the PR thread, then link the reply here. Suggested answer: the standalone endpoint is intentional and carried over from the Lab 2 Attachment lifecycle, so the client can refresh the list after an upload or soft removal without refetching the whole Ticket; Ticket Detail embeds the same metadata for the first render.
+- **My response:** The standalone endpoint is intentional. It comes from the Lab 2 Attachment lifecycle, so the client can refresh only the Attachment list after an upload or soft removal without refetching the whole Ticket, while Ticket Detail embeds the same metadata for the first render. Both responses are built by the same `attachmentMetadata` helper in `server/src/app.ts`, so they cannot drift apart. [Read the thread](https://github.com/jakkarin-promsee/toktickit/pull/42#discussion_r4175439134).
 - **Resolution:** Both endpoints are implemented and tested: the Lab 2 Attachment suite covers the standalone list, and API-08 covers the embedded list in Staff Ticket Detail.
 
 ### Follow-up on PR #47: extra reference lookups in the Queue

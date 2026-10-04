@@ -1,6 +1,6 @@
 # Lab 3 Sprint Engineering Specification
 
-Status: Approved engineering contract. Peer-reviewed and merged into `lab3-staging` as PR #42 before Issue #31 began; implemented by Issues #31–#40 (PRs #43–#51 and the Issue #40 PR). Definition of Done progress is recorded in section 10.
+Status: Approved engineering contract. Peer-reviewed and merged into `lab3-staging` as PR #42 before Issue #31 began; implemented by Issues #31–#40 (PRs #43–#52) and released to `main` through PR #54 on 4 October 2026. Definition of Done progress is recorded in section 10.
 
 Issue: #30
 
@@ -252,10 +252,10 @@ The coding agent must not report Sprint 3 complete until every item below is tru
 - [x] Every AC maps to a passing automated test or required visual/manual evidence in `tests.md`; no required test is skipped, disabled, commented out, flaky, or unrelated. Evidence: `tests.md` sections 3 and 10.
 - [x] Server unit/API/security/migration suites, client UI/style suites, production builds, and Playwright E2E/responsive/accessibility suites pass from the documented clean setup. Evidence: `tests.md` section 10, run twice on the Issue #40 branch; rerun on `lab3-staging` and final `main` under Issue #41.
 - [x] Desktop, tablet, mobile, keyboard, 200% zoom, focus, clipping, overlap, badge, editable/read-only, and horizontal-overflow checks pass for every major Lab 3 screen. Evidence: RESP-01, A11Y-01, STYLE-01, and the `ui-spec.md` section 12 checklist.
-- [ ] Required final screenshots and complete command output are captured from the final integrated behavior and remain readable. Open: screenshots exist under `artifacts/lab-03/screenshots/` from the Issue #40 branch; the final command output and any recapture come from final `main` under Issue #41.
+- [x] Required final screenshots and complete command output are captured from the final integrated behavior and remain readable. Evidence: after release PR #54, final `main` passed `npm run test:lab3:rerun`, `npm run test:e2e:rerun`, and `npm run test:visual`, and the screenshots under `artifacts/lab-03/screenshots/` were regenerated from that run (`tests.md` section 10).
 - [x] README setup, environment variables, migration, seed, credentials, run, test, storage, cleanup, and security limitations are current and contain no real secrets. Evidence: `README.md` updated in Issue #40.
-- [ ] Each feature PR receives peer review, comments and responses are recorded in `reviewer.md`, all features merge into `lab3-staging`, and the tested staging branch merges into `main`. Open: PRs #42–#51 are merged; the Issue #40 PR and the Issue #41 release PR are pending.
-- [ ] Submission evidence and the one required PDF are generated from final `main`, use the required Answer Part 1–9 headings, and contain working links and readable evidence. Open: Issue #41.
+- [x] Each feature PR receives peer review, comments and responses are recorded in `reviewer.md`, all features merge into `lab3-staging`, and the tested staging branch merges into `main`. Evidence: PRs #42–#53 approved and merged into `lab3-staging`, release PR #54 approved and merged into `main`, and every review, line comment, and response linked in `reviewer.md`.
+- [x] Submission evidence and the one required PDF are generated from final `main`, use the required Answer Part 1–9 headings, and contain working links and readable evidence. Evidence: the submission PDF is built from final `main` using the screenshot evidence in `ui-spec.md` section 12 and the final results in `tests.md` section 10.
 
 ## 11. Assumptions and Decisions
 
