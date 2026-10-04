@@ -43,3 +43,45 @@ describe("STYLE-01 Zen Green tokens and semantic hooks", () => {
     expect(css).toMatch(/@media \((min|max)-width:/);
   });
 });
+
+describe("STYLE-01 Issue #40 Zen Green consistency fixes", () => {
+  it("maps Bootstrap primary, success, outline, and link colors onto the green tokens", () => {
+    const primary = block(".btn-primary,\n.btn-success");
+    expect(primary).toContain("--bs-btn-bg: var(--green-700)");
+    expect(primary).toContain("--bs-btn-hover-bg: var(--green-800)");
+    expect(block(".btn-outline-primary")).toContain("--bs-btn-color: var(--green-700)");
+    expect(css).toMatch(/--bs-link-color: #006b3c/);
+    expect(block(".form-check-input:checked")).toContain("var(--green-700)");
+  });
+
+  it("gives every status, priority, role, and account badge its own tint class", () => {
+    for (const status of ["new", "open", "in-progress", "waiting-for-requester", "resolved", "closed", "reopened", "cancelled"]) expect(css).toContain(`.badge-status-${status} {`);
+    for (const priority of ["low", "medium", "high"]) expect(css).toContain(`.badge-priority-${priority} {`);
+    for (const role of ["requester", "it-staff", "administrator"]) expect(css).toContain(`.badge-role-${role} {`);
+    for (const state of ["active", "inactive", "password-change-required"]) expect(css).toContain(`.badge-account-${state} {`);
+  });
+
+  it("marks required fields visibly without changing their accessible name and keeps errors adjacent", () => {
+    expect(block(".form-label.required::after")).toContain('content: " *" / ""');
+    expect(block(".field-error")).toContain("var(--danger)");
+    expect(block("textarea.form-control")).toContain("min-height: 120px");
+    expect(block(".form-control,\n.form-select,\n.btn")).toContain("min-height: 44px");
+  });
+
+  it("keeps Internal Note composition visually distinct and tab selection independent of color", () => {
+    expect(block(".btn-note")).toContain("var(--note-border)");
+    expect(block(".comm-tab-internal")).toContain("--bs-btn-hover-bg: var(--note)");
+    const active = block(".comm-tab.is-active");
+    expect(active).toContain("font-weight: 700");
+    expect(active).toContain("box-shadow: inset");
+    expect(block(".comm-tab")).toContain("transition: none");
+    expect(block(".note-surface")).toContain("var(--note");
+  });
+
+  it("styles the shell with a white focus ring on green, aria-current navigation, and a collapsible mobile menu", () => {
+    expect(block(".app-header :focus-visible")).toContain("outline-color: #ffffff");
+    expect(block('.app-nav-link[aria-current="page"]')).toContain("font-weight: 700");
+    expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.app-collapsible\.is-open \{\s*display: flex;/);
+    expect(block(".zen-dialog-backdrop")).toContain("position: fixed");
+  });
+});
