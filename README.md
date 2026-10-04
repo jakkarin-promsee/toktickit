@@ -100,22 +100,19 @@ Open http://localhost:5173, select an active Development Requester, and continue
 ## Tests
 
 ```bash
-npm --prefix server test   # Supertest — API endpoints
-npm --prefix client test   # Vitest — UI states
-npm test                    # Both server and client suites
-npm run test:e2e            # Playwright — browser, responsive, accessibility, screenshots
-npm run test:all            # Unit/API/UI followed by Playwright
+npm run test:server         # Vitest + Supertest: contract, unit, migration, API, security, regression
+npm run test:client         # Vitest + Testing Library: UI component and style tests
+npm run test:lab3           # Server then client suites
+npm run test:lab3:rerun     # Server and client suites twice in a row
+npm run test:e2e            # Playwright: Lab 3 browser workflows in e2e/lab-03/
+npm run test:e2e:rerun      # Playwright suite twice in a row
 ```
 
-Server tests reset and seed the isolated PostgreSQL schema `lab2_test`. Playwright resets and seeds
-`lab2_e2e`, uses temporary Attachment storage under `.tmp/`, and starts isolated services on ports 3100
-and 5174. Development data in the default `public` schema is not changed. Override the defaults with
-`TEST_DATABASE_URL`, `PLAYWRIGHT_DATABASE_URL`, or `PLAYWRIGHT_ATTACHMENT_STORAGE`.
+Server tests reset and seed the isolated PostgreSQL schema `lab2_test`. Playwright resets and seeds `lab3_e2e`, generates a synthetic per-run seed password, uses temporary Attachment storage under `.tmp/`, and starts isolated services on ports 3100 and 5174. Development data in the default `public` schema is not changed. Override the defaults with `TEST_DATABASE_URL`, `PLAYWRIGHT_DATABASE_URL`, or `PLAYWRIGHT_ATTACHMENT_STORAGE`.
 
-Install the browser once with `npx playwright install chromium`. On this Windows workstation Playwright
-may use the installed Chrome executable; CI should install Chromium or set `PLAYWRIGHT_EXECUTABLE_PATH`.
+Install the browser once with `npx playwright install chromium`. On this Windows workstation Playwright may use the installed Chrome executable; CI should install Chromium or set `PLAYWRIGHT_EXECUTABLE_PATH`.
 
-Test files live under `server/tests/`, `client/tests/`, and `e2e/lab-02/`. Playwright screenshots are written to `artifacts/lab-02/screenshots/`.
+Test files live under `server/tests/`, `client/tests/`, and `e2e/lab-03/`. Results and traceability are recorded in `docs/lab-03/tests.md`.
 
 ## API
 
@@ -145,7 +142,7 @@ toktickit/
 │   └── tests/lab-01/ and tests/lab-02/
 ├── docs/lab-01/            tests.md · reviewer.md · ai_use.md
 ├── docs/lab-02/            contract, test plan, and integration evidence
-├── e2e/lab-02/             Playwright integration and responsive tests
+├── e2e/lab-03/             Playwright Lab 3 browser workflows
 ├── artifacts/lab-02/       reviewed visual evidence
 ├── .gitignore
 └── README.md
