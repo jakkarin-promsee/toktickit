@@ -8,7 +8,11 @@
   },
   "scripts": {
     "test": "npm --prefix server test && npm --prefix client test",
-    "test:all": "npm test"
+    "test:all": "npm test",
+    "test:server": "npm --prefix server test",
+    "test:client": "npm --prefix client test",
+    "test:lab3": "npm run test:server && npm run test:client",
+    "test:lab3:rerun": "npm run test:lab3 && npm run test:lab3"
   },
   "repository": {
     "type": "git",
