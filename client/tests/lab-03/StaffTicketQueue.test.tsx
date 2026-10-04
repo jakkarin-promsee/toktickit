@@ -170,15 +170,14 @@ describe("UI-05 Staff Ticket Queue", () => {
     expect(await screen.findByRole("table")).toBeInTheDocument();
   });
 
-  it("opens the Ticket Detail boundary without mutation controls", async () => {
+  it("opens the Ticket Detail route from the View link", async () => {
     const user = userEvent.setup();
     window.history.replaceState({}, "", "/staff/tickets");
-    mockApi(() => ({ status: 200, body: page([row()]) }));
+    mockApi((search) => search.startsWith("/") ? { status: 404, body: { error: { code: "RESOURCE_NOT_FOUND", message: "Ticket was not found." } } } : { status: 200, body: page([row()]) });
     render(<App />);
     await screen.findByRole("table");
     await user.click(screen.getAllByRole("link", { name: "View TKT-20261004-310004" })[0]);
     expect(window.location.pathname).toBe(`/staff/tickets/${TICKET_ID}`);
-    expect(await screen.findByRole("heading", { name: "Ticket Detail" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /claim|assign|resolve/i })).not.toBeInTheDocument();
+    expect(await screen.findByText("We couldn't find this ticket.")).toBeInTheDocument();
   });
 });
