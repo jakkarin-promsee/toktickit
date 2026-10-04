@@ -27,6 +27,7 @@ import {
 import { parseTicketQuery } from "./ticket-query.js";
 import { parseStaffQuery, StaffQuery, TICKET_STATUSES, TicketStatusValue } from "./staff-query.js";
 import { transitionRule } from "./status-transitions.js";
+import { singleValue } from "./ticket-query.js";
 import {
   MAX_ACTIVE_ATTACHMENTS,
   MAX_ATTACHMENT_BYTES,
@@ -1403,6 +1404,201 @@ app.post("/api/staff/tickets/:ticketId/internal-notes", async (req: Request, res
     res.status(201).json({ data: publicCommentView(note) });
   } catch (error) {
     ticketFailure(res, error, "POST internal note", "Note could not be saved. Please try again.");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Administrator User Management (Issue #37)
+// ---------------------------------------------------------------------------
+const USER_ROLES = ["REQUESTER", "IT_STAFF", "ADMINISTRATOR"] as const;
+type UserRoleValue = (typeof USER_ROLES)[number];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const userSummarySelect = {
+  id: true, displayName: true, email: true, role: true, isActive: true,
+  mustChangePassword: true, version: true, createdAt: true, updatedAt: true,
+} as const;
+
+class UserConflict extends Error {
+  constructor(public status: number, public code: string, message: string) { super(message); }
+}
+
+function validateUserFields(body: Record<string, unknown>): { fields: Record<string, string>; value?: { displayName: string; email: string; role: UserRoleValue; isActive: boolean } } {
+  const fields: Record<string, string> = {};
+  const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
+  const nameLength = Array.from(displayName).length;
+  if (typeof body.displayName !== "string" || nameLength < 2 || nameLength > 100) fields.displayName = "Display name must contain 2–100 characters.";
+  const email = typeof body.email === "string" ? normalizeEmail(body.email) : "";
+  if (typeof body.email !== "string" || email.length < 3 || email.length > 254 || !EMAIL_PATTERN.test(email)) fields.email = "Enter a valid email address of 254 characters or fewer.";
+  if (typeof body.role !== "string" || !(USER_ROLES as readonly string[]).includes(body.role)) fields.role = "Select exactly one role: Requester, IT Staff, or Administrator.";
+  if (typeof body.isActive !== "boolean") fields.isActive = "Active must be true or false.";
+  if (Object.keys(fields).length > 0) return { fields };
+  return { fields, value: { displayName, email, role: body.role as UserRoleValue, isActive: body.isActive as boolean } };
+}
+
+function hasExactKeys(body: unknown, keys: string[]): body is Record<string, unknown> {
+  return typeof body === "object" && body !== null && !Array.isArray(body) &&
+    Object.keys(body).length === keys.length && keys.every((key) => key in body);
+}
+
+function userFailure(res: Response, error: unknown, label: string) {
+  if (error instanceof UserConflict) {
+    sendError(res, error.status, error.code, error.message);
+    return;
+  }
+  if (isUniqueConstraintError(error)) {
+    sendError(res, 409, "EMAIL_ALREADY_EXISTS", "A user with this email already exists.", { email: "A user with this email already exists." });
+    return;
+  }
+  ticketFailure(res, error, label, "The user could not be saved. Please try again.");
+}
+
+app.get("/api/admin/users", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["ADMINISTRATOR"]);
+  if (!session) return;
+  const query = req.query as Record<string, unknown>;
+  let search = "";
+  let role: UserRoleValue | undefined;
+  try {
+    for (const key of Object.keys(query)) if (key !== "search" && key !== "role") throw new Error("unknown");
+    search = singleValue(query.search, "search")?.trim() ?? "";
+    if (Array.from(search).length > 120) throw new Error("search");
+    const roleValue = singleValue(query.role, "role");
+    if (roleValue !== undefined) {
+      if (!(USER_ROLES as readonly string[]).includes(roleValue)) throw new Error("role");
+      role = roleValue as UserRoleValue;
+    }
+  } catch {
+    sendError(res, 400, "INVALID_QUERY", "One or more user query parameters are invalid.");
+    return;
+  }
+  try {
+    const users = await getPrisma().user.findMany({
+      where: {
+        ...(role ? { role } : {}),
+        ...(search ? { OR: [{ displayName: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }] } : {}),
+      },
+      orderBy: [{ displayName: "asc" }, { id: "asc" }],
+      select: userSummarySelect,
+    });
+    res.status(200).json({ data: users });
+  } catch (error) {
+    ticketFailure(res, error, "GET /api/admin/users", "Users could not be loaded. Please try again.");
+  }
+});
+
+app.post("/api/admin/users", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["ADMINISTRATOR"]);
+  if (!session || !originAndCsrfValid(req, res, session)) return;
+  if (!hasExactKeys(req.body, ["displayName", "email", "role", "isActive", "initialPassword"])) {
+    sendError(res, 400, "MALFORMED_REQUEST", "The request body is not valid.");
+    return;
+  }
+  const checked = validateUserFields(req.body);
+  const passwordError = passwordPolicyError(req.body.initialPassword);
+  if (passwordError) checked.fields.initialPassword = passwordError;
+  if (!checked.value || passwordError) {
+    sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", checked.fields);
+    return;
+  }
+  const value = checked.value;
+  try {
+    const prisma = getPrisma();
+    if (await prisma.user.findUnique({ where: { email: value.email }, select: { id: true } })) {
+      sendError(res, 409, "EMAIL_ALREADY_EXISTS", "A user with this email already exists.", { email: "A user with this email already exists." });
+      return;
+    }
+    const passwordHash = await hashPassword(req.body.initialPassword as string);
+    const user = await prisma.user.create({
+      data: { ...value, mustChangePassword: true, credential: { create: { passwordHash } } },
+      select: userSummarySelect,
+    });
+    res.status(201).json({ data: user });
+  } catch (error) {
+    userFailure(res, error, "POST /api/admin/users");
+  }
+});
+
+function parseUserId(req: Request, res: Response): number | null {
+  if (!/^[1-9]\d{0,9}$/.test(req.params.userId)) {
+    sendError(res, 400, "INVALID_USER_ID", "User ID must be a positive integer.");
+    return null;
+  }
+  return Number(req.params.userId);
+}
+
+app.patch("/api/admin/users/:userId", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["ADMINISTRATOR"]);
+  if (!session || !originAndCsrfValid(req, res, session)) return;
+  const userId = parseUserId(req, res);
+  if (userId === null) return;
+  if (!hasExactKeys(req.body, ["displayName", "email", "role", "isActive", "version"])) {
+    sendError(res, 400, "MALFORMED_REQUEST", "The request body is not valid.");
+    return;
+  }
+  const checked = validateUserFields(req.body);
+  const version = req.body.version;
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 0) checked.fields.version = "Version must be a non-negative integer.";
+  if (!checked.value || checked.fields.version) {
+    sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", checked.fields);
+    return;
+  }
+  const value = checked.value;
+  try {
+    const updated = await getPrisma().$transaction(async (tx) => {
+      // One lock serializes every user edit, so two concurrent edits can never both remove the last active Administrator.
+      await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext('admin-user-edit'))`);
+      const target = await tx.user.findUnique({ where: { id: userId } });
+      if (!target) throw new UserConflict(404, "USER_NOT_FOUND", "User was not found.");
+      if (target.version !== version) throw new UserConflict(409, "STALE_USER", "This user changed. Reload before trying again.");
+      const losesActiveAdmin = target.role === "ADMINISTRATOR" && target.isActive && (!value.isActive || value.role !== "ADMINISTRATOR");
+      const deactivating = target.isActive && !value.isActive;
+      const roleChanged = target.role !== value.role;
+      if (target.id === session.user.id && (deactivating || roleChanged)) throw new UserConflict(409, "SELF_ADMIN_CHANGE_FORBIDDEN", "You cannot deactivate or change the role of your own account.");
+      if (losesActiveAdmin && await tx.user.count({ where: { role: "ADMINISTRATOR", isActive: true, id: { not: target.id } } }) === 0) throw new UserConflict(409, "LAST_ACTIVE_ADMINISTRATOR", "At least one active Administrator is required.");
+      if ((!value.isActive || value.role === "REQUESTER") && await tx.ticket.count({ where: { ownerId: target.id } }) > 0) throw new UserConflict(409, "USER_OWNS_TICKETS", "Reassign owned Tickets before deactivating this user or changing them to Requester.");
+      if (value.email !== target.email && await tx.user.findUnique({ where: { email: value.email }, select: { id: true } })) throw new UserConflict(409, "EMAIL_ALREADY_EXISTS", "A user with this email already exists.");
+      const result = await tx.user.update({ where: { id: target.id }, data: { ...value, version: { increment: 1 } }, select: userSummarySelect });
+      if (value.email !== target.email || roleChanged || target.isActive !== value.isActive) {
+        await tx.session.updateMany({ where: { userId: target.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      }
+      return result;
+    });
+    res.status(200).json({ data: updated });
+  } catch (error) {
+    userFailure(res, error, "PATCH /api/admin/users/:userId");
+  }
+});
+
+app.post("/api/admin/users/:userId/initial-password", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["ADMINISTRATOR"]);
+  if (!session || !originAndCsrfValid(req, res, session)) return;
+  const userId = parseUserId(req, res);
+  if (userId === null) return;
+  if (!hasExactKeys(req.body, ["initialPassword"])) {
+    sendError(res, 400, "MALFORMED_REQUEST", "The request body is not valid.");
+    return;
+  }
+  try {
+    const prisma = getPrisma();
+    if (!await prisma.user.findUnique({ where: { id: userId }, select: { id: true } })) {
+      sendError(res, 404, "USER_NOT_FOUND", "User was not found.");
+      return;
+    }
+    const passwordError = passwordPolicyError(req.body.initialPassword);
+    if (passwordError) {
+      sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", { initialPassword: passwordError });
+      return;
+    }
+    const passwordHash = await hashPassword(req.body.initialPassword as string);
+    await prisma.$transaction(async (tx) => {
+      await tx.credential.upsert({ where: { userId }, create: { userId, passwordHash }, update: { passwordHash, passwordChangedAt: new Date() } });
+      await tx.user.update({ where: { id: userId }, data: { mustChangePassword: true } });
+      await tx.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+    });
+    res.status(204).send();
+  } catch (error) {
+    userFailure(res, error, "POST initial-password");
   }
 });
 
