@@ -12,7 +12,9 @@
     "test:server": "npm --prefix server test",
     "test:client": "npm --prefix client test",
     "test:lab3": "npm run test:server && npm run test:client",
-    "test:lab3:rerun": "npm run test:lab3 && npm run test:lab3"
+    "test:lab3:rerun": "npm run test:lab3 && npm run test:lab3",
+    "test:e2e": "playwright test e2e/lab-03",
+    "test:e2e:rerun": "npm run test:e2e && npm run test:e2e"
   },
   "repository": {
     "type": "git",
