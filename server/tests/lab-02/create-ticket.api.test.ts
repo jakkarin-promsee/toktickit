@@ -47,7 +47,7 @@ describe("Issue #13 ticket creation API", () => {
       description: "Battery falls from full to 20% within one hour.",
       requestedPriority: "MEDIUM",
       currentStatus: "NEW",
-      itPriority: "UNASSIGNED",
+      itPriority: "MEDIUM",
     });
     expect(response.body.data.ticketNumber).toMatch(/^TKT-\d{8}-\d{6}$/);
     expect(response.body.data.ticketDate).toBe(response.body.data.createdAt);

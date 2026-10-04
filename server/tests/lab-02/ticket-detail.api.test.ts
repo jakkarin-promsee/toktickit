@@ -50,7 +50,7 @@ describe("Issue #15 Requester-owned Ticket Detail API", () => {
         mimeType: "application/pdf",
         sizeBytes: 1234,
         sha256: "a".repeat(64),
-        uploadedByRequesterId: 1,
+        uploadedByUserId: 1,
       },
     });
     createdAttachmentIds.push(attachment.id);
@@ -69,7 +69,7 @@ describe("Issue #15 Requester-owned Ticket Detail API", () => {
       relatedSystem: { id: 7, name: "Corporate Laptop" },
       summary: "Laptop battery drains quickly",
       requestedPriority: "MEDIUM",
-      itPriority: "UNASSIGNED",
+      itPriority: "MEDIUM",
       currentStatus: "NEW",
       description: "Battery falls from full to 20% within one hour.",
       createdAt: ticket.createdAt,
