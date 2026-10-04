@@ -2,19 +2,28 @@ import { getPrisma } from "../src/prisma.js";
 import { seedDatabase } from "./seed-database.js";
 import {
   CATEGORY_SEEDS,
+  INTERNAL_NOTE_SEEDS,
+  PUBLIC_COMMENT_SEEDS,
   RELATED_SYSTEM_SEEDS,
-  REQUESTER_SEEDS,
+  TICKET_SEEDS,
+  USER_SEEDS,
 } from "./seed-data.js";
 
 async function main() {
   const prisma = getPrisma();
+  const initialPassword = process.env.LAB3_SEED_INITIAL_PASSWORD;
+  if (!initialPassword) {
+    throw new Error("LAB3_SEED_INITIAL_PASSWORD is required for local Lab 3 seed credentials.");
+  }
 
-  await seedDatabase(prisma);
+  await seedDatabase(prisma, { initialPassword });
 
   console.log(
     `Seeded ${CATEGORY_SEEDS.length} categories, ` +
       `${RELATED_SYSTEM_SEEDS.length} related systems, and ` +
-      `${REQUESTER_SEEDS.length} Development Requesters.`
+      `${USER_SEEDS.length} Users, ${TICKET_SEEDS.length} Tickets, ` +
+      `${PUBLIC_COMMENT_SEEDS.length} Public Comments, and ` +
+      `${INTERNAL_NOTE_SEEDS.length} Internal Notes.`
   );
 }
 

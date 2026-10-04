@@ -62,7 +62,7 @@ psql -U postgres -c "ALTER ROLE toktickit CREATEDB;"
 Both sides ship a `.env.example`. Copy each to `.env` and adjust if your local values differ:
 
 ```bash
-cd server && cp .env.example .env     # DATABASE_URL, PORT
+cd server && cp .env.example .env     # DATABASE_URL, LAB3_SEED_INITIAL_PASSWORD, PORT
 cd ../client && cp .env.example .env  # VITE_API_URL
 cd ..
 ```
@@ -70,6 +70,8 @@ cd ..
 On PowerShell, use `Copy-Item .env.example .env` instead.
 
 Real `.env` files are git-ignored and must never be committed.
+
+Set `LAB3_SEED_INITIAL_PASSWORD` in `server/.env` to a local-only value containing 12–128 characters with at least one lowercase letter, uppercase letter, digit, and symbol. See [`docs/lab-03/seed-credentials.md`](docs/lab-03/seed-credentials.md) for the seeded account list and credential safety rules.
 
 ### 4. Apply migrations and seed
 
@@ -79,9 +81,7 @@ npx prisma migrate dev
 npx prisma db seed
 ```
 
-The seed is idempotent — running it more than once will not create duplicate categories, related
-systems, or Development Requesters. Stable category/system names and Requester email addresses are the
-upsert keys.
+The seed is idempotent: repeated runs do not duplicate Categories, Related Systems, Users, Credentials, Tickets, Public Comments, or Internal Notes, and existing credential hashes are not rotated.
 
 ### 5. Run both sides
 

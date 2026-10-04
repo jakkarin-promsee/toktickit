@@ -37,8 +37,8 @@ const upload = multer({
 
 app.get("/api/requesters", async (_req: Request, res: Response) => {
   try {
-    const requesters = await getPrisma().requesterUser.findMany({
-      where: { isActive: true },
+    const requesters = await getPrisma().user.findMany({
+      where: { role: "REQUESTER", isActive: true },
       orderBy: [{ displayName: "asc" }, { id: "asc" }],
       select: { id: true, displayName: true, email: true },
     });
@@ -169,7 +169,7 @@ async function ownedAttachment(
   return getPrisma().attachment.findFirst({
     where: {
       id: attachmentId,
-      ticket: { requesterId },
+      ticket: { submittedByUserId: requesterId },
     },
     include: attachmentIncludes,
   });
@@ -192,8 +192,8 @@ async function getActiveRequester(req: Request, res: Response) {
   }
 
   try {
-    const requester = await getPrisma().requesterUser.findFirst({
-      where: { id: Number(rawId), isActive: true },
+    const requester = await getPrisma().user.findFirst({
+      where: { id: Number(rawId), role: "REQUESTER", isActive: true },
       select: { id: true, displayName: true, email: true },
     });
     if (!requester) {
@@ -246,15 +246,16 @@ async function createTicket(
       return await prisma.ticket.create({
         data: {
           ticketNumber,
-          requesterId,
+          submittedByUserId: requesterId,
           categoryId: input.categoryId,
           relatedSystemId: input.relatedSystemId,
           summary: input.summary,
           description: input.description,
           requestedPriority: input.requestedPriority,
+          itPriority: input.requestedPriority,
         },
         include: {
-          requester: { select: { id: true, displayName: true } },
+          submittedBy: { select: { id: true, displayName: true } },
           category: { select: { id: true, name: true } },
           relatedSystem: { select: { id: true, name: true } },
         },
@@ -316,7 +317,7 @@ app.post("/api/tickets", async (req: Request, res: Response) => {
         id: ticket.id,
         ticketNumber: ticket.ticketNumber,
         ticketDate: ticket.createdAt,
-        requester: ticket.requester,
+        requester: ticket.submittedBy,
         category: ticket.category,
         relatedSystem: ticket.relatedSystem,
         summary: ticket.summary,
@@ -380,7 +381,7 @@ app.post(
 
     const prisma = getPrisma();
     const ticket = await prisma.ticket.findFirst({
-      where: { id: ticketId, requesterId: requester.id },
+      where: { id: ticketId, submittedByUserId: requester.id },
       select: { id: true },
     });
     if (!ticket) {
@@ -417,7 +418,7 @@ app.post(
             mimeType: validation.value.mimeType,
             sizeBytes: validation.value.sizeBytes,
             sha256: crypto.createHash("sha256").update(req.file!.buffer).digest("hex"),
-            uploadedByRequesterId: requester.id,
+            uploadedByUserId: requester.id,
           },
           include: attachmentIncludes,
         });
@@ -451,7 +452,7 @@ app.get("/api/tickets/:ticketId/attachments", async (req: Request, res: Response
   }
   try {
     const ticket = await getPrisma().ticket.findFirst({
-      where: { id: ticketId, requesterId: requester.id },
+      where: { id: ticketId, submittedByUserId: requester.id },
       select: { id: true },
     });
     if (!ticket) {
@@ -552,7 +553,7 @@ app.delete("/api/attachments/:attachmentId", async (req: Request, res: Response)
       where: { id: attachmentId },
       data: {
         removedAt: new Date(),
-        removedByRequesterId: requester.id,
+        removedByUserId: requester.id,
         removalReason: req.body.reason.trim(),
       },
       include: attachmentIncludes,
@@ -578,10 +579,10 @@ app.get("/api/tickets/:ticketId", async (req: Request, res: Response) => {
     const ticket = await getPrisma().ticket.findFirst({
       where: {
         id: ticketId,
-        requesterId: requester.id,
+        submittedByUserId: requester.id,
       },
       include: {
-        requester: { select: { id: true, displayName: true } },
+        submittedBy: { select: { id: true, displayName: true } },
         category: { select: { id: true, name: true } },
         relatedSystem: { select: { id: true, name: true } },
         attachments: {
@@ -625,7 +626,7 @@ app.get("/api/tickets/:ticketId", async (req: Request, res: Response) => {
         id: ticket.id,
         ticketNumber: ticket.ticketNumber,
         ticketDate: ticket.createdAt,
-        requester: ticket.requester,
+        requester: ticket.submittedBy,
         category: ticket.category,
         relatedSystem: ticket.relatedSystem,
         summary: ticket.summary,
@@ -670,7 +671,7 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
 
   try {
     const where: Prisma.TicketWhereInput = {
-      requesterId: requester.id,
+      submittedByUserId: requester.id,
       ...(query.search
         ? {
             OR: [

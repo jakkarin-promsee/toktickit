@@ -1,10 +1,11 @@
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { app } from "../../src/app.js";
 import { getPrisma } from "../../src/prisma.js";
 
 const prisma = getPrisma();
 const createdTicketIds: string[] = [];
+let isolatedRequesterId: number;
 
 async function createTicket(
   requesterId: number,
@@ -32,6 +33,18 @@ async function createTicket(
   return response.body.data;
 }
 
+beforeAll(async () => {
+  const requester = await prisma.user.create({
+    data: {
+      email: "lab2-my-tickets-test@example.test",
+      displayName: "Lab 2 My Tickets Test",
+      role: "REQUESTER",
+      isActive: true,
+    },
+  });
+  isolatedRequesterId = requester.id;
+});
+
 afterEach(async () => {
   if (createdTicketIds.length > 0) {
     await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } });
@@ -40,17 +53,18 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await prisma.user.delete({ where: { id: isolatedRequesterId } });
   await prisma.$disconnect();
 });
 
 describe("Issue #14 My Tickets API", () => {
   it("returns only the selected Requester's tickets with pagination metadata", async () => {
-    const owned = await createTicket(1);
+    const owned = await createTicket(isolatedRequesterId);
     await createTicket(2, { summary: "Mali's VPN access issue" });
 
     const response = await request(app)
       .get("/api/tickets?page=1&pageSize=10")
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
 
     expect(response.status).toBe(200);
     expect(response.body.data.map((ticket: { id: string }) => ticket.id)).toEqual([
@@ -67,12 +81,12 @@ describe("Issue #14 My Tickets API", () => {
   });
 
   it("applies search, combined filters, sorting, and returns an empty beyond-end page", async () => {
-    await createTicket(1, {
+    await createTicket(isolatedRequesterId, {
       categoryId: 1,
       summary: "VPN access issue",
       requestedPriority: "HIGH",
     });
-    await createTicket(1, {
+    await createTicket(isolatedRequesterId, {
       categoryId: 2,
       summary: "Laptop battery issue",
       requestedPriority: "MEDIUM",
@@ -82,7 +96,7 @@ describe("Issue #14 My Tickets API", () => {
       .get(
         "/api/tickets?search=VPN&categoryId=1&status=NEW&requestedPriority=HIGH&sortBy=summary&sortOrder=asc",
       )
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
 
     expect(filtered.status).toBe(200);
     expect(filtered.body.data).toHaveLength(1);
@@ -94,7 +108,7 @@ describe("Issue #14 My Tickets API", () => {
 
     const beyondEnd = await request(app)
       .get("/api/tickets?page=2&pageSize=10")
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
     expect(beyondEnd.status).toBe(200);
     expect(beyondEnd.body.data).toEqual([]);
     expect(beyondEnd.body.pagination.page).toBe(2);
@@ -105,13 +119,13 @@ describe("Issue #14 My Tickets API", () => {
     ["related system", "relatedSystemId=7", "VPN access issue"],
     ["requested priority", "requestedPriority=HIGH", "VPN access issue"],
   ])("applies the %s filter", async (_label, query, expectedSummary) => {
-    await createTicket(1, {
+    await createTicket(isolatedRequesterId, {
       categoryId: 1,
       relatedSystemId: 7,
       summary: "VPN access issue",
       requestedPriority: "HIGH",
     });
-    await createTicket(1, {
+    await createTicket(isolatedRequesterId, {
       categoryId: 2,
       relatedSystemId: 6,
       summary: "Printer issue",
@@ -120,7 +134,7 @@ describe("Issue #14 My Tickets API", () => {
 
     const response = await request(app)
       .get(`/api/tickets?${query}`)
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
 
     expect(response.status).toBe(200);
     expect(response.body.data.map((ticket: { summary: string }) => ticket.summary)).toEqual([
@@ -129,15 +143,15 @@ describe("Issue #14 My Tickets API", () => {
   });
 
   it("applies deterministic sort fields and directions", async () => {
-    const first = await createTicket(1, { summary: "Alpha issue" });
-    const second = await createTicket(1, { summary: "Beta issue" });
+    const first = await createTicket(isolatedRequesterId, { summary: "Alpha issue" });
+    const second = await createTicket(isolatedRequesterId, { summary: "Beta issue" });
 
     const ascending = await request(app)
       .get("/api/tickets?sortBy=summary&sortOrder=asc")
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
     const descending = await request(app)
       .get("/api/tickets?sortBy=summary&sortOrder=desc")
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
 
     expect(ascending.body.data.map((ticket: { id: string }) => ticket.id)).toEqual([
       first.id,
@@ -150,12 +164,12 @@ describe("Issue #14 My Tickets API", () => {
   });
 
   it("uses id as a stable tie-breaker when the primary sort value matches", async () => {
-    const first = await createTicket(1, { summary: "Same summary" });
-    const second = await createTicket(1, { summary: "Same summary" });
+    const first = await createTicket(isolatedRequesterId, { summary: "Same summary" });
+    const second = await createTicket(isolatedRequesterId, { summary: "Same summary" });
 
     const response = await request(app)
       .get("/api/tickets?sortBy=summary&sortOrder=asc")
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
 
     expect(response.status).toBe(200);
     expect(response.body.data.map((ticket: { id: string }) => ticket.id)).toEqual(
@@ -165,15 +179,15 @@ describe("Issue #14 My Tickets API", () => {
 
   it("returns the requested page slice and accurate page metadata", async () => {
     for (let index = 0; index < 11; index += 1) {
-      await createTicket(1, { summary: `Pagination ticket ${index}` });
+      await createTicket(isolatedRequesterId, { summary: `Pagination ticket ${index}` });
     }
 
     const firstPage = await request(app)
       .get("/api/tickets?page=1&pageSize=10")
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
     const secondPage = await request(app)
       .get("/api/tickets?page=2&pageSize=10")
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
 
     expect(firstPage.body.data).toHaveLength(10);
     expect(firstPage.body.pagination).toMatchObject({
@@ -198,7 +212,7 @@ describe("Issue #14 My Tickets API", () => {
   ])("rejects invalid query: %s", async (path) => {
     const response = await request(app)
       .get(path)
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
 
     expect(response.status).toBe(400);
     expect(response.body.error).toMatchObject({ code: "INVALID_QUERY" });
@@ -211,7 +225,7 @@ describe("Issue #14 My Tickets API", () => {
 
     const response = await request(app)
       .get("/api/tickets")
-      .set("X-Requester-Id", "1");
+      .set("X-Requester-Id", String(isolatedRequesterId));
 
     countSpy.mockRestore();
     expect(response.status).toBe(500);
