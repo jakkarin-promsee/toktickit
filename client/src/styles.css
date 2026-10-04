@@ -66,6 +66,16 @@ body {
   box-shadow: 0 2px 8px rgb(23 53 42 / 8%);
 }
 
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.auth-card {
+  width: min(100%, 480px);
+}
+
 .required-marker {
   color: var(--danger);
 }
@@ -99,6 +109,13 @@ body {
 }
 
 @media (max-width: 767px) {
+  .auth-page {
+    align-items: start;
+  }
+
+  .auth-card {
+    padding: 1.25rem !important;
+  }
   .app-menu-toggle {
     display: inline-block;
   }
