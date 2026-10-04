@@ -148,3 +148,12 @@ body {
     width: 100%;
   }
 }
+
+.comment-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.requester-detail dd {
+  overflow-wrap: anywhere;
+}
