@@ -25,6 +25,7 @@ import {
   validateCreateTicketInput,
 } from "./ticket-validation.js";
 import { parseTicketQuery } from "./ticket-query.js";
+import { parseStaffQuery, StaffQuery } from "./staff-query.js";
 import {
   MAX_ACTIVE_ATTACHMENTS,
   MAX_ATTACHMENT_BYTES,
@@ -1055,6 +1056,84 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
         ? "Tickets are temporarily unavailable."
         : "Tickets could not be loaded. Please try again.",
     );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// IT Staff Ticket Queue (Issue #35). Registered before the generic /api/staff/*
+// guard below so this read-only route is the one that answers.
+// ---------------------------------------------------------------------------
+app.get("/api/staff/tickets", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF", "ADMINISTRATOR"]);
+  if (!session) return;
+
+  let query: StaffQuery;
+  try {
+    query = parseStaffQuery(req.query as Record<string, unknown>);
+  } catch {
+    sendError(res, 400, "INVALID_QUERY", "One or more ticket query parameters are invalid.");
+    return;
+  }
+
+  try {
+    const prisma = getPrisma();
+    const invalid = () => sendError(res, 400, "INVALID_QUERY", "One or more ticket query parameters are invalid.");
+    if (query.categoryId && !await prisma.category.findFirst({ where: { id: query.categoryId, isActive: true }, select: { id: true } })) return invalid();
+    if (query.relatedSystemId && !await prisma.relatedSystem.findFirst({ where: { id: query.relatedSystemId, isActive: true }, select: { id: true } })) return invalid();
+    if (typeof query.owner === "number" && !await prisma.user.findFirst({ where: { id: query.owner, isActive: true, role: { in: ["IT_STAFF", "ADMINISTRATOR"] } }, select: { id: true } })) return invalid();
+
+    const ownerFilter: Prisma.TicketWhereInput =
+      query.owner === "me" ? { ownerId: session.user.id }
+        : query.owner === "unassigned" ? { ownerId: null }
+          : typeof query.owner === "number" ? { ownerId: query.owner } : {};
+    const where: Prisma.TicketWhereInput = {
+      ...(query.search ? { OR: [
+        { ticketNumber: { contains: query.search, mode: "insensitive" } },
+        { summary: { contains: query.search, mode: "insensitive" } },
+        { submittedBy: { displayName: { contains: query.search, mode: "insensitive" } } },
+        { submittedBy: { email: { contains: query.search, mode: "insensitive" } } },
+      ] } : {}),
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.relatedSystemId ? { relatedSystemId: query.relatedSystemId } : {}),
+      ...(query.status ? { currentStatus: query.status } : {}),
+      ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
+      ...(query.itPriority ? { itPriority: query.itPriority } : {}),
+      ...ownerFilter,
+    };
+    const sortField = query.sortBy === "status" ? "currentStatus" : query.sortBy;
+    const orderBy: Prisma.TicketOrderByWithRelationInput[] = [{ [sortField]: query.sortOrder }, { id: query.sortOrder }];
+    const [totalItems, tickets, total, unassigned, mine] = await Promise.all([
+      prisma.ticket.count({ where }),
+      prisma.ticket.findMany({
+        where,
+        orderBy,
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        select: {
+          id: true, ticketNumber: true, summary: true,
+          submittedBy: { select: { id: true, displayName: true } },
+          category: { select: { id: true, name: true } },
+          relatedSystem: { select: { id: true, name: true } },
+          requestedPriority: true, itPriority: true, currentStatus: true,
+          owner: { select: { id: true, displayName: true, role: true } },
+          requesterResolvedAt: true, createdAt: true, updatedAt: true, version: true,
+        },
+      }),
+      prisma.ticket.count(),
+      prisma.ticket.count({ where: { ownerId: null } }),
+      prisma.ticket.count({ where: { ownerId: session.user.id } }),
+    ]);
+    const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize);
+    res.status(200).json({
+      data: tickets.map(({ submittedBy, ...ticket }) => ({ ...ticket, requester: submittedBy })),
+      pagination: {
+        page: query.page, pageSize: query.pageSize, totalItems, totalPages,
+        hasPreviousPage: query.page > 1, hasNextPage: query.page < totalPages,
+      },
+      counts: { total, unassigned, mine },
+    });
+  } catch (error) {
+    ticketFailure(res, error, "GET /api/staff/tickets", "Tickets could not be loaded. Please try again.");
   }
 });
 

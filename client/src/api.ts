@@ -399,3 +399,33 @@ export function markProblemAppearsResolved(ticketId: string, version: number, cs
 export function fetchTicketDetail(ticketId: string): Promise<TicketDetail> {
   return authRequest<TicketDetail>(`/api/tickets/${ticketId}`);
 }
+
+export interface StaffQueueTicket {
+  id: string;
+  ticketNumber: string;
+  summary: string;
+  requester: { id: number; displayName: string };
+  category: Category;
+  relatedSystem: RelatedSystem;
+  requestedPriority: RequestedPriority;
+  itPriority: RequestedPriority;
+  currentStatus: TicketStatus;
+  owner: { id: number; displayName: string; role: UserRole } | null;
+  requesterResolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface StaffQueueResponse {
+  data: StaffQueueTicket[];
+  pagination: TicketListResponse["pagination"];
+  counts: { total: number; unassigned: number; mine: number };
+}
+
+export async function getStaffQueue(search: string): Promise<StaffQueueResponse> {
+  const response = await fetch(`${API_URL}/api/staff/tickets${search}`, { credentials: "include" });
+  const payload = await response.json() as Partial<StaffQueueResponse> & { error?: { code?: string; message?: string } };
+  if (!response.ok || !payload.data || !payload.pagination || !payload.counts) throw new ApiError(response.status, payload);
+  return payload as StaffQueueResponse;
+}
