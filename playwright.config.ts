@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import crypto from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -8,7 +9,7 @@ const installedChrome = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.
 const executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH ??
   (process.platform === "win32" && existsSync(installedChrome) ? installedChrome : undefined);
 const e2eDatabaseUrl = process.env.PLAYWRIGHT_DATABASE_URL ??
-  "postgresql://toktickit:toktickit@localhost:5432/toktickit?schema=lab2_e2e";
+  "postgresql://toktickit:toktickit@localhost:5432/toktickit?schema=lab3_e2e";
 
 process.env.DATABASE_URL = e2eDatabaseUrl;
 process.env.ATTACHMENT_STORAGE = process.env.PLAYWRIGHT_ATTACHMENT_STORAGE ??
@@ -16,6 +17,10 @@ process.env.ATTACHMENT_STORAGE = process.env.PLAYWRIGHT_ATTACHMENT_STORAGE ??
 process.env.PLAYWRIGHT_API_URL = apiUrl;
 process.env.VITE_API_URL = apiUrl;
 process.env.PORT = new URL(apiUrl).port;
+// The API only accepts state-changing requests from the configured client origin.
+process.env.CLIENT_ORIGIN = new URL(clientUrl).origin;
+// Synthetic per-run seed password: never a real secret, and shared with workers through the environment.
+process.env.LAB3_SEED_INITIAL_PASSWORD ??= `E2e-${crypto.randomBytes(12).toString("base64url")}!Aa1`;
 
 export default defineConfig({
   testDir: "./e2e",
