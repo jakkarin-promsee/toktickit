@@ -109,7 +109,7 @@ describe("UI-01 Login Issue #38 coverage", () => {
     render(<App />);
     await fillAndSubmit(user);
     expect(await screen.findByRole("heading", { name: "Ticket Queue" })).toBeInTheDocument();
-    expect(screen.getByText("IT_STAFF")).toBeInTheDocument();
+    expect(screen.getByText("IT Staff")).toBeInTheDocument();
     expect(screen.getByText(/Narin Staff/)).toBeInTheDocument();
     expect(screen.queryByText("User Management")).not.toBeInTheDocument();
   });

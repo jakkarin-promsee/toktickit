@@ -33,10 +33,19 @@ export async function signIn(page: Page, email: string, password = seedPassword)
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
-/** Signs in and waits for the authenticated shell, so later navigation always carries the session cookie. */
+/** Signs in and waits for the authenticated shell, so later navigation always carries the session cookie. The header banner is visible at every width, unlike the collapsible mobile navigation. */
 export async function signInReady(page: Page, email: string, password = seedPassword) {
   await signIn(page, email, password);
-  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
+  await expect(page.getByRole("banner")).toBeVisible();
+}
+
+/** Opens the collapsed mobile menu when the Menu button is shown, so navigation and Logout become reachable. */
+export async function openMenuIfCollapsed(page: Page) {
+  const toggle = page.getByRole("button", { name: "Menu", exact: true });
+  if (await toggle.isVisible()) {
+    await toggle.click();
+    await expect(page.getByRole("button", { name: "Close menu" })).toHaveAttribute("aria-expanded", "true");
+  }
 }
 
 /** Reads the CSRF token of the browser session so direct API calls reuse the same cookie. */

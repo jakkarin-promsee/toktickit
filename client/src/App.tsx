@@ -1,9 +1,10 @@
-import { FormEvent, MouseEvent, useEffect, useState } from "react";
+import { FormEvent, KeyboardEvent, MouseEvent, useEffect, useRef, useState } from "react";
 import { UserManagement } from "./UserManagement.js";
 import { StaffTicketDetail } from "./StaffTicketDetail.js";
 import { StaffTicketQueue } from "./StaffTicketQueue.js";
 import { CreateTicket, MyTickets, RequesterTicketDetail } from "./RequesterTickets.js";
 import { ApiError, changePassword, CurrentUser, getCurrentUser, login, logout } from "./api.js";
+import { describedBy, focusFirstInvalid, RoleBadge } from "./ui.js";
 
 document.documentElement.dataset.theme = "zen-green";
 
@@ -33,38 +34,134 @@ export default function App() {
 
 function Login({ onSignedIn, notice }: { onSignedIn: (user: CurrentUser) => void; notice: string }) {
   const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [show, setShow] = useState(false); const [errors, setErrors] = useState<Record<string, string>>({}); const [failure, setFailure] = useState(""); const [busy, setBusy] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
   async function submit(event: FormEvent) {
     event.preventDefault(); const next: Record<string, string> = {};
     if (!email.trim()) next.email = "Email is required."; else if (!/^\S+@\S+\.\S+$/.test(email.trim()) || email.trim().length > 254) next.email = "Enter a valid email address.";
     if (!password) next.password = "Password is required."; else if (password.length > 128) next.password = "Password must contain 128 characters or fewer.";
-    setErrors(next); setFailure(""); if (Object.keys(next).length) return; setBusy(true);
+    setErrors(next); setFailure(""); if (Object.keys(next).length) { focusFirstInvalid(form.current); return; } setBusy(true);
     try { onSignedIn(await login(email, password)); } catch (error) { const apiError = error as ApiError; setPassword(""); setFailure(apiError.status === 429 ? `Too many sign-in attempts. Try again in ${apiError.retryAfter ?? "a few"} minutes.` : "Sign-in failed. Check your credentials or account status."); } finally { setBusy(false); }
   }
-  return <main className="container py-5 auth-page"><section className="card zen-card shadow-sm p-4 mx-auto auth-card" aria-labelledby="login-heading"><h1 className="h3">TokTickIT</h1><h2 id="login-heading" className="h4">Sign in</h2><p>Use your TokTickIT email address and password.</p>{notice && <div role="status" className="alert alert-success">{notice}</div>}{failure && <div role="alert" className="alert alert-danger">{failure}</div>}<form onSubmit={(event) => void submit(event)} noValidate><label className="form-label" htmlFor="login-email">Email</label><input id="login-email" className="form-control" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(errors.email)} disabled={busy} />{errors.email && <div className="text-danger" role="alert">{errors.email}</div>}<label className="form-label mt-3" htmlFor="login-password">Password</label><input id="login-password" className="form-control" type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} aria-invalid={Boolean(errors.password)} disabled={busy} />{errors.password && <div className="text-danger" role="alert">{errors.password}</div>}<button type="button" className="btn btn-link px-0" aria-pressed={show} onClick={() => setShow((value) => !value)} disabled={busy}>Show password</button><button className="btn btn-success w-100" type="submit" disabled={busy} aria-busy={busy}>{busy ? "Signing in…" : "Sign in"}</button></form></section></main>;
+  return (
+    <main className="container py-5 auth-page">
+      <section className="card zen-card shadow-sm p-4 mx-auto auth-card" aria-labelledby="login-heading">
+        <h1 className="h3 auth-brand">TokTickIT</h1>
+        <h2 id="login-heading" className="h4">Sign in</h2>
+        <p>Use your TokTickIT email address and password.</p>
+        {notice && <div role="status" className="alert alert-success">{notice}</div>}
+        {failure && <div role="alert" className="alert alert-danger">{failure}</div>}
+        <form ref={form} onSubmit={(event) => void submit(event)} noValidate>
+          <label className="form-label required" htmlFor="login-email">Email</label>
+          <input id="login-email" className={`form-control${errors.email ? " is-invalid" : ""}`} type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} aria-required="true" aria-invalid={Boolean(errors.email)} aria-describedby={describedBy(errors.email && "login-email-error")} disabled={busy} />
+          {errors.email && <div id="login-email-error" className="field-error" role="alert">{errors.email}</div>}
+          <label className="form-label required mt-3" htmlFor="login-password">Password</label>
+          <input id="login-password" className={`form-control${errors.password ? " is-invalid" : ""}`} type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} aria-required="true" aria-invalid={Boolean(errors.password)} aria-describedby={describedBy(errors.password && "login-password-error")} disabled={busy} />
+          {errors.password && <div id="login-password-error" className="field-error" role="alert">{errors.password}</div>}
+          <button type="button" className="btn btn-link px-0" aria-pressed={show} onClick={() => setShow((value) => !value)} disabled={busy}>Show password</button>
+          <button className="btn btn-success w-100" type="submit" disabled={busy} aria-busy={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+        </form>
+      </section>
+    </main>
+  );
 }
 
 function ChangePassword({ user, onChanged, onLoggedOut }: { user: CurrentUser; onChanged: (user: CurrentUser) => void; onLoggedOut: () => void }) {
   const [currentPassword, setCurrentPassword] = useState(""); const [newPassword, setNewPassword] = useState(""); const [confirmation, setConfirmation] = useState(""); const [errors, setErrors] = useState<Record<string, string>>({}); const [failure, setFailure] = useState(""); const [busy, setBusy] = useState(false); const [logoutBusy, setLogoutBusy] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
   async function submit(event: FormEvent) {
-    event.preventDefault(); const next: Record<string, string> = {}; if (!currentPassword) next.currentPassword = "Current password is required."; const policy = newPasswordError(newPassword); if (policy) next.newPassword = policy; if (newPassword === currentPassword) next.newPassword = "New password must differ from current password."; if (confirmation !== newPassword) next.confirmation = "Passwords do not match."; setErrors(next); setFailure(""); if (Object.keys(next).length) return; setBusy(true);
-    try { onChanged(await changePassword(currentPassword, newPassword, user.csrfToken)); } catch (error) { const apiError = error as ApiError; setErrors(apiError.fields ?? {}); setFailure(apiError.fields ? "Check the highlighted fields." : "We could not change your password right now. Try again."); } finally { setBusy(false); }
+    event.preventDefault(); const next: Record<string, string> = {}; if (!currentPassword) next.currentPassword = "Current password is required."; const policy = newPasswordError(newPassword); if (policy) next.newPassword = policy; if (newPassword === currentPassword) next.newPassword = "New password must differ from current password."; if (confirmation !== newPassword) next.confirmation = "Passwords do not match."; setErrors(next); setFailure(""); if (Object.keys(next).length) { focusFirstInvalid(form.current); return; } setBusy(true);
+    try { onChanged(await changePassword(currentPassword, newPassword, user.csrfToken)); } catch (error) { const apiError = error as ApiError; setErrors(apiError.fields ?? {}); setFailure(apiError.fields ? "Check the highlighted fields." : "We could not change your password right now. Try again."); if (apiError.fields) focusFirstInvalid(form.current); } finally { setBusy(false); }
   }
   async function signOut() { setLogoutBusy(true); try { await logout(user.csrfToken); onLoggedOut(); } catch { setFailure("We could not sign you out. Try again."); setLogoutBusy(false); } }
-  return <main className="container py-5 auth-page"><section className="card zen-card shadow-sm p-4 mx-auto auth-card" aria-labelledby="change-password-heading"><h1 className="h3">TokTickIT</h1><h2 id="change-password-heading" className="h4">Change your initial password before continuing</h2><p>Password must be 12–128 characters and include lowercase, uppercase, digit, and symbol characters.</p>{failure && <div className="alert alert-danger" role="alert">{failure}</div>}<form onSubmit={(event) => void submit(event)} noValidate><PasswordField id="current-password" label="Current password" value={currentPassword} onChange={setCurrentPassword} error={errors.currentPassword} disabled={busy || logoutBusy} /><PasswordField id="new-password" label="New password" value={newPassword} onChange={setNewPassword} error={errors.newPassword} disabled={busy || logoutBusy} /><PasswordField id="confirm-new-password" label="Confirm new password" value={confirmation} onChange={setConfirmation} error={errors.confirmation} disabled={busy || logoutBusy} /><button className="btn btn-success w-100 mt-3" type="submit" disabled={busy || logoutBusy} aria-busy={busy}>{busy ? "Changing password…" : "Change password"}</button></form><button className="btn btn-outline-secondary w-100 mt-2" onClick={() => void signOut()} disabled={busy || logoutBusy}>{logoutBusy ? "Signing out…" : "Logout"}</button></section></main>;
+  return (
+    <main className="container py-5 auth-page">
+      <section className="card zen-card shadow-sm p-4 mx-auto auth-card" aria-labelledby="change-password-heading">
+        <h1 className="h3 auth-brand">TokTickIT</h1>
+        <h2 id="change-password-heading" className="h4">Change your initial password before continuing</h2>
+        <p id="password-rules">Password must be 12–128 characters and include lowercase, uppercase, digit, and symbol characters.</p>
+        {failure && <div className="alert alert-danger" role="alert">{failure}</div>}
+        <form ref={form} onSubmit={(event) => void submit(event)} noValidate>
+          <PasswordField id="current-password" label="Current password" autoComplete="current-password" value={currentPassword} onChange={setCurrentPassword} error={errors.currentPassword} disabled={busy || logoutBusy} />
+          <PasswordField id="new-password" label="New password" autoComplete="new-password" hintId="password-rules" value={newPassword} onChange={setNewPassword} error={errors.newPassword} disabled={busy || logoutBusy} />
+          <PasswordField id="confirm-new-password" label="Confirm new password" autoComplete="new-password" value={confirmation} onChange={setConfirmation} error={errors.confirmation} disabled={busy || logoutBusy} />
+          <button className="btn btn-success w-100 mt-3" type="submit" disabled={busy || logoutBusy} aria-busy={busy}>{busy ? "Changing password…" : "Change password"}</button>
+        </form>
+        <button className="btn btn-outline-secondary w-100 mt-2" onClick={() => void signOut()} disabled={busy || logoutBusy}>{logoutBusy ? "Signing out…" : "Logout"}</button>
+      </section>
+    </main>
+  );
 }
 
-function PasswordField({ id, label, value, onChange, error, disabled }: { id: string; label: string; value: string; onChange: (value: string) => void; error?: string; disabled: boolean }) { return <div className="mt-3"><label className="form-label" htmlFor={id}>{label}</label><input id={id} className="form-control" type="password" autoComplete="new-password" value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} disabled={disabled} />{error && <div className="text-danger" role="alert">{error}</div>}</div>; }
+function PasswordField({ id, label, autoComplete, hintId, value, onChange, error, disabled }: { id: string; label: string; autoComplete: string; hintId?: string; value: string; onChange: (value: string) => void; error?: string; disabled: boolean }) {
+  return (
+    <div className="mt-3">
+      <label className="form-label required" htmlFor={id}>{label}</label>
+      <input id={id} className={`form-control${error ? " is-invalid" : ""}`} type="password" autoComplete={autoComplete} value={value} onChange={(event) => onChange(event.target.value)} aria-required="true" aria-invalid={Boolean(error)} aria-describedby={describedBy(hintId, error && `${id}-error`)} disabled={disabled} />
+      {error && <div id={`${id}-error`} className="field-error" role="alert">{error}</div>}
+    </div>
+  );
+}
+
+interface Destination { path: string; label: string }
+
+function destinationsFor(role: CurrentUser["role"]): Destination[] {
+  if (role === "REQUESTER") return [{ path: "/tickets", label: "My Tickets" }, { path: "/tickets/new", label: "Create Ticket" }];
+  if (role === "IT_STAFF") return [{ path: "/staff/tickets", label: "Ticket Queue" }];
+  return [{ path: "/admin/users", label: "Users" }, { path: "/staff/tickets", label: "Ticket Review" }];
+}
 
 function Shell({ user, notice, onChangePassword, onLoggedOut }: { user: CurrentUser; notice: string; onChangePassword: () => void; onLoggedOut: () => void }) {
-  const [busy, setBusy] = useState(false); const [failure, setFailure] = useState(""); const [path, setPath] = useState(() => window.location.pathname);
-  const destinations = user.role === "REQUESTER" ? [{ path: "/tickets", label: "My Tickets" }, { path: "/tickets/new", label: "Create Ticket" }] : user.role === "IT_STAFF" ? [{ path: "/staff/tickets", label: "Ticket Queue" }] : [{ path: "/admin/users", label: "User Management" }];
-  const allowedPaths = new Set(["/", ...destinations.map((destination) => destination.path)]);
-  const requesterTicketId = user.role === "REQUESTER" ? /^\/tickets\/([0-9a-f-]{36})$/i.exec(path)?.[1] : undefined;
-  const staffDetailId = user.role === "IT_STAFF" ? /^\/staff\/tickets\/([0-9a-f-]{36})$/i.exec(path)?.[1] : undefined;
-  const forbidden = !allowedPaths.has(path) && !requesterTicketId && !staffDetailId;
+  const [busy, setBusy] = useState(false); const [failure, setFailure] = useState(""); const [path, setPath] = useState(() => window.location.pathname); const [menuOpen, setMenuOpen] = useState(false);
+  const menuToggle = useRef<HTMLButtonElement>(null);
+  const destinations = destinationsFor(user.role);
   const home = destinations[0];
+  const current = path === "/" ? home.path : path;
+  const canReviewTickets = user.role === "IT_STAFF" || user.role === "ADMINISTRATOR";
+  const requesterTicketId = user.role === "REQUESTER" ? /^\/tickets\/([0-9a-f-]{36})$/i.exec(path)?.[1] : undefined;
+  const staffDetailId = canReviewTickets ? /^\/staff\/tickets\/([0-9a-f-]{36})$/i.exec(path)?.[1] : undefined;
+  const forbidden = !destinations.some((destination) => destination.path === current) && !requesterTicketId && !staffDetailId;
+  // Detail routes keep their parent destination marked as the current page.
+  const activePath = requesterTicketId ? "/tickets" : staffDetailId ? "/staff/tickets" : current;
+  const queueLabel = user.role === "ADMINISTRATOR" ? "Ticket Review" : "Ticket Queue";
+
   useEffect(() => { const onPopState = () => setPath(window.location.pathname); window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
-  function navigate(event: MouseEvent<HTMLAnchorElement>, nextPath: string) { event.preventDefault(); window.history.pushState({}, "", nextPath); setPath(nextPath); }
+  function navigate(event: MouseEvent<HTMLAnchorElement>, nextPath: string) { event.preventDefault(); window.history.pushState({}, "", nextPath); setPath(nextPath); setMenuOpen(false); }
   async function signOut() { setBusy(true); setFailure(""); try { await logout(user.csrfToken); onLoggedOut(); } catch { setFailure("We could not sign you out. Try again."); setBusy(false); } }
-  return <><header className="app-header p-3"><div className="container d-flex flex-wrap justify-content-between gap-2"><strong>TokTickIT</strong><nav aria-label="Main navigation">{destinations.map((destination) => <a key={destination.path} href={destination.path} className="btn btn-sm btn-outline-light me-2" onClick={(event) => navigate(event, destination.path)}>{destination.label}</a>)}</nav><span>{user.displayName} <span className="badge text-bg-light">{user.role}</span></span><div><button className="btn btn-sm btn-outline-light me-2" onClick={onChangePassword} disabled={busy}>Change password</button><button className="btn btn-sm btn-light" onClick={() => void signOut()} disabled={busy}>{busy ? "Signing out…" : "Logout"}</button></div></div></header><main className="container py-5">{forbidden ? <><h1>Access restricted</h1><p role="alert">You do not have access to this destination.</p></> : user.role === "REQUESTER" ? (path === "/tickets/new" ? <CreateTicket user={user} onCreated={(id) => { window.history.pushState({}, "", `/tickets/${id}`); setPath(`/tickets/${id}`); }} /> : requesterTicketId ? <RequesterTicketDetail key={requesterTicketId} ticketId={requesterTicketId} user={user} onBack={(event) => navigate(event, "/tickets")} /> : <MyTickets onOpen={(event, id) => navigate(event, `/tickets/${id}`)} />) : user.role === "IT_STAFF" ? (staffDetailId ? <StaffTicketDetail key={staffDetailId} ticketId={staffDetailId} user={user} onBack={(event) => navigate(event, "/staff/tickets")} /> : <StaffTicketQueue onOpen={(event, id) => navigate(event, `/staff/tickets/${id}`)} />) : user.role === "ADMINISTRATOR" ? <UserManagement user={user} /> : <><h1>{home.label}</h1><p>Your role-specific workspace will be added in the next Lab 3 issues.</p></>}{notice && <div className="alert alert-success" role="status">{notice}</div>}{failure && <div className="alert alert-danger" role="alert">{failure}</div>}</main></>;
+  function onHeaderKeyDown(event: KeyboardEvent<HTMLElement>) { if (event.key === "Escape" && menuOpen) { setMenuOpen(false); menuToggle.current?.focus(); } }
+
+  let content;
+  if (forbidden) content = <><h1>Access restricted</h1><p role="alert">You do not have access to this destination.</p><a href={home.path} onClick={(event) => navigate(event, home.path)}>Go to {home.label}</a></>;
+  else if (user.role === "REQUESTER") content = path === "/tickets/new" ? <CreateTicket user={user} onCreated={(id) => { window.history.pushState({}, "", `/tickets/${id}`); setPath(`/tickets/${id}`); }} /> : requesterTicketId ? <RequesterTicketDetail key={requesterTicketId} ticketId={requesterTicketId} user={user} onBack={(event) => navigate(event, "/tickets")} /> : <MyTickets onOpen={(event, id) => navigate(event, `/tickets/${id}`)} />;
+  else if (staffDetailId) content = <StaffTicketDetail key={staffDetailId} ticketId={staffDetailId} user={user} backLabel={`Back to ${queueLabel}`} onBack={(event) => navigate(event, "/staff/tickets")} />;
+  else if (current === "/staff/tickets") content = <StaffTicketQueue readOnly={user.role === "ADMINISTRATOR"} onOpen={(event, id) => navigate(event, `/staff/tickets/${id}`)} />;
+  else content = <UserManagement user={user} />;
+
+  return (
+    <>
+      <a className="skip-link visually-hidden-focusable" href="#main-content">Skip to main content</a>
+      <header className="app-header" onKeyDown={onHeaderKeyDown}>
+        <div className="container app-header-inner">
+          <a className="app-brand" href={home.path} onClick={(event) => navigate(event, home.path)}>TokTickIT</a>
+          <button ref={menuToggle} type="button" className="btn btn-sm btn-outline-light app-menu-toggle" aria-expanded={menuOpen} aria-controls="app-nav app-actions" onClick={() => setMenuOpen((value) => !value)}>{menuOpen ? "Close menu" : "Menu"}</button>
+          <nav id="app-nav" aria-label="Main navigation" className={`app-collapsible app-nav${menuOpen ? " is-open" : ""}`}>
+            <ul className="app-nav-links">
+              {destinations.map((destination) => (
+                <li key={destination.path}><a href={destination.path} className="app-nav-link" aria-current={activePath === destination.path ? "page" : undefined} onClick={(event) => navigate(event, destination.path)}>{destination.label}</a></li>
+              ))}
+            </ul>
+          </nav>
+          <div className="app-identity"><span className="app-identity-name">{user.displayName}</span> <RoleBadge role={user.role} className="badge-on-dark" /></div>
+          <div id="app-actions" className={`app-collapsible app-actions${menuOpen ? " is-open" : ""}`}>
+            <button className="btn btn-sm btn-outline-light" onClick={onChangePassword} disabled={busy}>Change password</button>
+            <button className="btn btn-sm btn-light" onClick={() => void signOut()} disabled={busy} aria-busy={busy}>{busy ? "Signing out…" : "Logout"}</button>
+          </div>
+        </div>
+      </header>
+      <main id="main-content" className="container py-4 py-md-5" tabIndex={-1}>
+        {notice && <div className="alert alert-success" role="status">{notice}</div>}
+        {failure && <div className="alert alert-danger" role="alert">{failure} <button className="btn btn-sm btn-outline-secondary" onClick={() => void signOut()}>Retry</button></div>}
+        {content}
+      </main>
+    </>
+  );
 }

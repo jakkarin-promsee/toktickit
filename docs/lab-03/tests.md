@@ -1,6 +1,6 @@
 # Lab 3 Test Plan
 
-Status: Test DD contract created before Lab 3 production implementation; automated unit, API/integration, security, migration, regression, UI component, and UI style results recorded by Issue #38; browser E2E results recorded by Issue #39. Responsive, accessibility, and visual rows remain planned for Issue #40.
+Status: Test DD contract created before Lab 3 production implementation; automated unit, API/integration, security, migration, regression, UI component, and UI style results recorded by Issue #38; browser E2E results recorded by Issue #39; responsive, accessibility, and visual evidence recorded by Issue #40. Every planned row now has a recorded result.
 
 Last updated: 4 October 2026
 
@@ -21,7 +21,7 @@ Test isolation uses disposable PostgreSQL schemas, independently hashed test pas
 
 ## 2. Test matrix
 
-Final status values: `Pass` means the listed files passed in both consecutive runs recorded in section 10 on 4 October 2026; `Planned (#40)` means the row is owned by the responsive, accessibility, and visual evidence Issue and has no result yet.
+Final status values: `Pass` means the listed files passed in both consecutive runs recorded in section 10 on 4 October 2026. VISUAL-01 produces screenshots for human review and passes once per evidence run on a fresh seed.
 
 | Test ID | Type | Requirement / AC | What it verifies | Expected result | Actual automated file | Final status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -52,16 +52,16 @@ Final status values: `Pass` means the listed files passed in both consecutive ru
 | FAIL-01 | API / integration | FR-27 / BR-39 / AC-24 | Forced database failure for login, current user, Requester Tickets/Comments, Staff Queue/Detail/Notes, Administrator Users, and reference data, with a redaction scan for SQL, paths, passwords, hashes, connection strings, and stack frames | Consistent safe envelope and `500/503`; no session cookie and no sensitive output | `server/tests/lab-03/safe-failures.api.test.ts` | Pass |
 | UI-01 | UI component | FR-01, FR-27 / AC-01, AC-02, AC-24 | Login structure, email/password validation, Show password, busy duplicate prevention, generic failure, inactive-safe copy, rate limit message, role routing, and password-change gate routing | Accessible state and one request; no account-existence disclosure; correct destination | `client/tests/lab-03/Login.test.tsx` | Pass |
 | UI-02 | UI component | FR-02–FR-04 / AC-03, AC-04 | Mandatory Change Password rules and boundaries, confirmation, different-password rule, busy, CSRF header, wrong current, safe failure, success continuation, blocked navigation, and Logout | Normal app remains blocked until success; correct safe feedback and continuation | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
-| UI-03 | UI component | FR-04–FR-05 / AC-05 | Requester/Staff/Administrator navigation, identity and role, password action, direct forbidden route, session check, and password-change gate on every route | Only permitted destinations/actions render and route guards never expose prior User data | `client/tests/lab-03/AppShell.test.tsx` | Pass |
+| UI-03 | UI component | FR-04–FR-05 / AC-05 | Requester/Staff/Administrator navigation, full-text role badge, `aria-current`, skip link, mobile Menu `aria-expanded`/`aria-controls`/Escape focus return, Administrator Users and read-only Ticket Review, direct forbidden route with home link, and the password-change gate on every route | Only permitted destinations/actions render and route guards never expose prior User data | `client/tests/lab-03/AppShell.test.tsx` | Pass |
 | UI-04 | UI component | FR-07–FR-10, FR-17 / AC-07, AC-08, AC-09, AC-10 | Requester Create Ticket without identity, My Tickets, Requester Detail Comments, safe text, Comment validation/busy/failure, conditional resolution signal confirmation/conflict/success, and absence of Internal/Staff controls | Owned interactions work; signal does not alter status; forbidden UI is absent without replacing backend tests | `client/tests/lab-03/RequesterTicketDetail.test.tsx`; `client/tests/lab-03/RequesterCreateTicket.test.tsx` | Pass |
 | UI-05 | UI component | FR-11 / AC-11 | Queue controls, debounce, URL restoration/reset, counts, table/cards semantics, ownership/status/priorities, page behavior, loading/empty/no-results/forbidden/failure | Stable query and distinct accessible states with equivalent card/table data | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Pass |
 | UI-06 | UI component | FR-12–FR-17 / AC-12–AC-16 | Staff Detail groups, claim/reassign, priority, next statuses, owner-disabled transitions, confirmations, stale refresh, separate Public/Internal drafts, Attachments, and safe states | Correct controls by mode; drafts persist on failure; Internal/Public distinction cannot be confused | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Pass |
 | UI-07 | UI component | FR-18–FR-22 / AC-17–AC-21 | User list/search/filter/table/cards, create/edit/full validation, exactly one role, duplicate email, dirty close, version conflict, self-deactivation, last active Administrator, owner conflict, initial password reset warning, success, forbidden, and failure | Minimalist workflow is complete, safe, accessible, and retains input on recoverable errors | `client/tests/lab-03/UserManagement.test.tsx` | Pass |
-| STYLE-01 | UI style | FR-26 / AC-23 | Zen Green tokens, Internal Note tokens, theme activation, shell/card/badge/read-only/note hooks, focus-visible outline, long-content wrapping, and the mobile breakpoint | Required visual/semantic hooks exist and meaning never depends on color alone | `client/tests/lab-03/zen-green-style.test.tsx` | Pass |
-| RESP-01 | Responsive | FR-26 / AC-23 | Login, Change Password, Requester Detail, Queue, Staff Detail, User Management, and shell at 1440×900, 820×1180, and 390×844 plus 200% zoom | No page overflow, clipping, overlap, covered focus, hidden action, or information loss across table/card changes | `e2e/lab-03/responsive.spec.ts` | Planned (#40) |
+| STYLE-01 | UI style | FR-26 / AC-23 | Zen Green tokens and theme activation; Bootstrap primary/outline/link/focus/checkbox mapped to green; per-value status, priority, role, and account badge classes with full text; required marker with empty alternative text; adjacent field errors; 120 px textareas and 44 px controls; amber Internal Note button and tab; color-independent tab selection; header focus ring, `aria-current` styling, and the collapsible mobile menu | Required visual/semantic hooks exist and meaning never depends on color alone | `client/tests/lab-03/zen-green-style.test.tsx`; `client/tests/lab-03/ui-components.test.tsx` | Pass |
+| RESP-01 | Responsive | FR-26 / AC-23 | Login and validation, Change Password, the Requester shell and Menu, My Tickets, Create Ticket validation, Requester Detail, Staff Queue and no-results, Staff Detail with every tab and the confirmation dialog, User Management list/create/edit/reset dialog, and Administrator Ticket Review at 1440×900, 820×1180, 390×844, and 720×450 (200% zoom of a 1440 px window) | No page-level horizontal scroll and no visible control, label, heading, or badge outside the viewport; Queue/User tables at 768 px and above and equivalent cards below; Menu only below 768 px; mobile touch targets at least 44 px | `e2e/lab-03/responsive.spec.ts` | Pass |
 | REG-01 | Regression | FR-06–FR-08, FR-24 / BR-18, BR-44–BR-45, BR-48 / AC-06–AC-08, AC-22 | Lab 1 references and Lab 2 Ticket Number, validation, create/list/detail, query, Attachment lifecycle, removed selector API, and migrated data under authenticated Requester | All retained behavior passes; only selector/header assumptions are replaced | `server/tests/lab-01/*.test.ts`; `server/tests/lab-02/*.test.ts`; `server/tests/lab-03/data-migration.test.ts`; `client/tests/lab-03/RequesterCreateTicket.test.tsx`; `client/tests/lab-03/RequesterTicketDetail.test.tsx` | Pass |
-| A11Y-01 | Accessibility | FR-26 / AC-23 | Keyboard-only login, password change, queue/detail actions, dialogs, Comments/Notes, user panels, heading order, labels, errors/live regions, focus restore, and 200% zoom | Logical visible focus and complete operation with no keyboard trap or inaccessible feedback | `e2e/lab-03/accessibility.spec.ts` | Planned (#40) |
-| VISUAL-01 | Visual | FR-26 / AC-23, AC-25 | Named required screen states and three viewport captures with checklist review for design, role navigation, badges, editable/read-only, validation, focus, clipping, overlap, and overflow | Readable approved screenshots match `ui-spec.md`; visual review supplements rather than replaces assertions | `e2e/lab-03/visual-evidence.spec.ts` and `artifacts/lab-03/screenshots/` | Planned (#40) |
+| A11Y-01 | Accessibility | FR-26 / AC-23 | One `h1`, no skipped heading levels, labelled controls, named buttons/tabs, unique ids, valid `aria-describedby`/`aria-labelledby`/`aria-controls` targets, and described invalid fields on every major screen and validation state; WCAG AA 4.5:1 text contrast computed in the browser; keyboard-only Login with visible focus and first-invalid focus; skip link and shell navigation; mobile Menu Escape; dialog initial focus, Tab containment, Escape, and focus restore; arrow-key tabs; User Management error descriptions and reset-dialog focus | No structural or contrast violation; logical visible focus and complete operation with no keyboard trap | `e2e/lab-03/accessibility.spec.ts`; `client/tests/lab-03/ui-components.test.tsx` | Pass |
+| VISUAL-01 | Visual | FR-26 / AC-23, AC-25 | 80 screenshots of every major screen at desktop, tablet, and mobile plus loading, validation, busy, success, empty, no-results, forbidden, conflict, owner-conflict, self-protection, and failure states, and 15 before/after pairs (30 images) for the defects fixed in Issue #40, each checked for overflow when captured and reviewed against the `ui-spec.md` section 12 checklist | Readable screenshots with synthetic data only and no visible password, token, or cookie; visual review supplements rather than replaces assertions | `e2e/lab-03/visual-evidence.spec.ts` and `artifacts/lab-03/screenshots/` | Pass |
 | E2E-01 | E2E | FR-01–FR-05 / AC-01–AC-05 | Valid login with shell name and role, reload keeps the session, invalid and inactive login with the same safe copy and no session, local validation, first-login user blocked in UI and API until a valid change, short-password rejection, old password refused afterwards, role-specific navigation, forbidden direct URLs, logout, and direct UI/API access blocked after logout | Complete authentication lifecycle works with real cookie/CSRF/database and safe feedback | `e2e/lab-03/authentication.spec.ts` | Pass |
 | E2E-02 | E2E | FR-06–FR-10 / AC-06–AC-10 | Authenticated Requester creates a Ticket with no selector and finds it in My Tickets, posts a Public Comment, confirms Problem Appears Resolved without a status change, and is refused another Requester's Ticket, comments, and every Internal Note path through UI and direct API, including a forged `X-Requester-Id` | Owned Requester workflow succeeds with no selectable/forgeable identity or cross-owner leak | `e2e/lab-03/requester-ticket-flow.spec.ts` | Pass |
 | E2E-03 | E2E | FR-11–FR-17 / AC-11–AC-16 | Queue with seeded owners/statuses, search, owner and status filters, ticket-number sort both ways, 12-Ticket pagination, no-results, open detail from the queue, claim, confirmed reassign, IT Priority, Open → In Progress → confirmed Resolved, Public Comment vs Internal Note separation seen by the Requester, Attachment download bytes, forbidden `CLOSED` jump, stale-version Refresh, and Administrator read-only direct API | Complete Staff workflow follows the matrix; public/internal content remains distinct; Admin cannot mutate | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
@@ -98,11 +98,11 @@ Final status values: `Pass` means the listed files passed in both consecutive ru
 | AC-25 | REG-01, RESP-01, A11Y-01, VISUAL-01, E2E-01, E2E-02, E2E-03, E2E-04 plus complete-suite output |
 | AC-26 | DOC-01 plus the human Reviewer checklist in `specification.md` |
 
-Every AC has at least one automated target. After Issue #39, every AC except the responsive/accessibility/visual part of AC-23 and AC-25 has at least one passing automated test, including a passing browser E2E test for AC-01 to AC-21; the remaining parts are owned by Issue #40. Human peer review and visual inspection supplement but do not replace DOC-01, responsive, accessibility, security, or E2E assertions.
+Every AC has at least one automated target. After Issue #40, every AC has at least one passing automated test, including a passing browser E2E test for AC-01 to AC-21 and passing responsive, accessibility, style, and visual evidence for AC-23 and AC-25. Human peer review and visual inspection supplement but do not replace DOC-01, responsive, accessibility, security, or E2E assertions.
 
 ## 4. Functional Requirement traceability
 
-| Functional requirement | Passing automated evidence | Browser E2E (Pass) or planned evidence |
+| Functional requirement | Passing automated evidence | Passing browser evidence |
 | --- | --- | --- |
 | FR-01 Authentication | API-01, UNIT-01, UNIT-02, UI-01 | E2E-01 |
 | FR-02 Initial-password gate | API-02, SEC-02, UI-02, UI-03 | E2E-01 |
@@ -129,7 +129,7 @@ Every AC has at least one automated target. After Issue #39, every AC except the
 | FR-23 Data model | DB-01 | — |
 | FR-24 Migration preservation | DB-01, REG-01 | E2E-02 |
 | FR-25 Idempotent seed | DB-02 | — |
-| FR-26 Zen Green, responsive, accessible UI | STYLE-01 | RESP-01, A11Y-01, VISUAL-01 |
+| FR-26 Zen Green, responsive, accessible UI | STYLE-01, UI-03 | RESP-01, A11Y-01, VISUAL-01 |
 | FR-27 Safe failure states | FAIL-01, SEC-01, UI-01, UI-02, UI-05, UI-06, UI-07 | — |
 | FR-28 Verification gate | DOC-01 plus the complete-suite output in section 9 | E2E-01–E2E-04 |
 
@@ -179,16 +179,18 @@ E2E isolation rules added by Issue #39:
 
 For Login, Change Password, Requester Ticket Detail, Staff Queue, Staff Ticket Detail, User Management, and the role shell at 1440×900, 820×1180, and 390×844, plus 200% zoom where supported:
 
-- [ ] Zen Green tokens, typography, spacing, borders, cards, and role/status/priority/account/owner badges match `ui-spec.md`.
-- [ ] Role navigation, identity, password action, Logout, primary actions, filters, and pagination remain reachable and correctly authorized.
-- [ ] Editable, read-only, invalid, focused, disabled, busy, success, warning, error, public, and internal-note states are distinguishable without color alone.
-- [ ] Labels, required markers, descriptions, counters, and field errors remain adjacent and programmatically associated.
-- [ ] Desktop semantic tables and mobile cards expose equivalent required Queue and User information.
-- [ ] Dialog focus traps, Escape, initial focus, return focus, live announcements, and first-invalid focus work with keyboard only.
-- [ ] Long emails, Ticket Numbers, names, Comments, Notes, and filenames wrap without clipping or page-level horizontal scrolling.
-- [ ] No overlap, covered focus, hidden required action, inaccessible menu, or unexpected focus movement occurs.
+Completed under Issue #40; the screen-by-screen checklist with screenshot paths is `ui-spec.md` section 12.
 
-Evidence directories are `artifacts/lab-03/screenshots/authentication/`, `staff-queue/`, `staff-ticket-detail/`, `user-management/`, and optional `requester/` for regression evidence.
+- [x] Zen Green tokens, typography, spacing, borders, cards, and role/status/priority/account/owner badges match `ui-spec.md` (STYLE-01, VISUAL-01).
+- [x] Role navigation, identity, password action, Logout, primary actions, filters, and pagination remain reachable and correctly authorized (UI-03, RESP-01, E2E-01).
+- [x] Editable, read-only, invalid, focused, disabled, busy, success, warning, error, public, and internal-note states are distinguishable without color alone (STYLE-01, A11Y-01, VISUAL-01).
+- [x] Labels, required markers, descriptions, counters, and field errors remain adjacent and programmatically associated (A11Y-01).
+- [x] Desktop semantic tables and mobile cards expose equivalent required Queue and User information (RESP-01).
+- [x] Dialog focus traps, Escape, initial focus, return focus, and first-invalid focus work with keyboard only (A11Y-01, `ui-components.test.tsx`).
+- [x] Long emails, Ticket Numbers, names, Comments, Notes, and filenames wrap without clipping or page-level horizontal scrolling (RESP-01, VISUAL-01).
+- [x] No overlap, covered focus, hidden required action, inaccessible menu, or unexpected focus movement occurs (RESP-01, A11Y-01).
+
+Evidence directories are `artifacts/lab-03/screenshots/authentication/`, `staff-queue/`, `staff-ticket-detail/`, `user-management/`, `requester/` for regression evidence, and `before-after/` for the defects fixed in Issue #40.
 
 ## 9. Commands
 
@@ -211,11 +213,14 @@ npm run test:lab3:rerun
 npm --prefix server run build
 npm --prefix client run build
 
-# Lab 3 browser E2E (starts its own API on 3100 and client on 5174)
+# Lab 3 browser E2E, responsive, and accessibility (starts its own API on 3100 and client on 5174; skips @visual)
 npm run test:e2e
 
 # Same E2E suite twice in a row
 npm run test:e2e:rerun
+
+# Screenshot evidence on a freshly seeded schema (writes artifacts/lab-03/screenshots/)
+npm run test:visual
 ```
 
 The server suite needs the local PostgreSQL from the README; `TEST_DATABASE_URL` and `TEST_ATTACHMENT_STORAGE` override the default isolated schema and storage path.
@@ -227,15 +232,15 @@ The server suite needs the local PostgreSQL from the README; `TEST_DATABASE_URL`
 | Issue #30 requirement baseline | Complete | `docs/lab-03/issue-30-requirements.md` |
 | Issue #31 data-foundation requirements | Complete | `docs/lab-03/issue-31-requirements.md` |
 | Full server suite (Lab 1, Lab 2, Lab 3) | Pass: 28 files, 163 tests, run 1 and run 2 | `npm run test:lab3:rerun` on 4 October 2026 |
-| Full client suite (UI component and style) | Pass: 9 files, 69 tests, run 1 and run 2 | `npm run test:lab3:rerun` on 4 October 2026 |
+| Full client suite (UI component and style) | Pass: 10 files, 80 tests, run 1 and run 2 | `npm run test:client` twice on 4 October 2026 |
 | Lab 3 server files | Pass: `auth-validation` 2, `auth.api` 11, `authorization.api` 8, `comments-notes.api` 11, `data-migration` 4, `engineering-contract` 6, `requester-resolution.api` 6, `safe-failures.api` 3, `seed-data` 2, `session` 6, `staff-queue.api` 14, `staff-ticket-detail.api` 23, `users-admin.api` 19 | Same run |
 | Lab 1/Lab 2 regression server files | Pass: 3 Lab 1 files with 4 tests and 12 Lab 2 files with 44 tests | Same run |
-| Lab 3 client files | Pass: `AppShell` 3, `ChangePassword` 6, `Login` 8, `RequesterCreateTicket` 3, `RequesterTicketDetail` 10, `StaffTicketDetail` 11, `StaffTicketQueue` 10, `UserManagement` 13, `zen-green-style` 5 | Same run |
+| Lab 3 client files | Pass: `AppShell` 6, `ChangePassword` 6, `Login` 8, `RequesterCreateTicket` 3, `RequesterTicketDetail` 10, `StaffTicketDetail` 11, `StaffTicketQueue` 10, `UserManagement` 13, `ui-components` 3, `zen-green-style` 10 | Same run |
 | Production builds | Pass | `npm --prefix server run build`; `npm --prefix client run build` on 4 October 2026 |
 | Skipped/focused tests | None | `grep` command in section 7 returns no matches |
-| Browser E2E | Pass: 4 files, 20 tests, run 1 and run 2 (no retries, no flaky) | `npm run test:e2e:rerun` on 4 October 2026 |
-| E2E files | Pass: `authentication.spec.ts` 5, `requester-ticket-flow.spec.ts` 3, `staff-ticket-flow.spec.ts` 6, `user-administration.spec.ts` 6 | Same run |
-| Responsive, accessibility, and visual | Planned (#40) | No result is claimed |
+| Browser E2E, responsive, and accessibility | Pass: 6 files, 58 tests, run 1 and run 2 (no retries, no flaky) | `npm run test:e2e:rerun` on 4 October 2026 |
+| E2E files | Pass: `authentication.spec.ts` 5, `requester-ticket-flow.spec.ts` 3, `staff-ticket-flow.spec.ts` 6, `user-administration.spec.ts` 6, `responsive.spec.ts` 28, `accessibility.spec.ts` 10 | Same run |
+| Visual evidence | Pass: 1 file, 9 tests; 110 screenshots (80 evidence and 30 before/after) | `npm run test:visual` on a fresh seed on 4 October 2026 |
 | Peer review and approval | Pending human review | Record actual reviewer/comments/responses/approval later in `docs/lab-03/reviewer.md` |
 
 ## 11. Issue #38 coverage audit
@@ -258,7 +263,10 @@ Production code was not changed in Issue #38; no new test revealed a defect.
 
 ## 12. Known limitations
 
-- Responsive, accessibility, and visual rows remain `Planned (#40)`; the Issue #39 E2E suite runs at the default desktop viewport only.
+- Accessibility checks are project-built structure, keyboard, and computed-contrast assertions rather than a full external engine such as axe-core, so they do not cover every WCAG success criterion; screen-reader output was not verified with assistive technology.
+- 200% zoom is checked by laying out at the equivalent 720×450 CSS viewport rather than by changing browser zoom.
+- Empty queue, forbidden, dependency failure, and rate-limit screenshots use mocked HTTP responses and are named accordingly; their real behavior is covered by the API and UI suites.
+- Last-active-Administrator and stale-User conflicts are evidenced by E2E-04 and API-13 rather than screenshots, because they need concurrent requests.
 - E2E login rate limiting is not exercised in the browser because the limiter is per email and IP; it is covered by API-01.
 - Playwright keeps traces and screenshots only on failure; they can contain the synthetic per-run seed password typed into the login form, which is generated at runtime and never a real credential.
 - The login limiter is in-memory per server process, so its tests cover one process only; a restart clears the counter by design for the local lab.

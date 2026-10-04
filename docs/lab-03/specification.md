@@ -1,6 +1,6 @@
 # Lab 3 Sprint Engineering Specification
 
-Status: Proposed engineering contract for peer review; Lab 3 production implementation remains blocked until approval
+Status: Approved engineering contract. Peer-reviewed and merged into `lab3-staging` as PR #42 before Issue #31 began; implemented by Issues #31–#40 (PRs #43–#51 and the Issue #40 PR). Definition of Done progress is recorded in section 10.
 
 Issue: #30
 
@@ -241,21 +241,21 @@ The normative endpoint, cookie, CSRF, request/response, validation, authorizatio
 
 ## 10. Definition of Done
 
-The coding agent must not report Sprint 3 complete until every item below is true; passing Issue #30 documentation tests alone completes only the proposed-contract implementation, not the Lab 3 product.
+The coding agent must not report Sprint 3 complete until every item below is true; passing Issue #30 documentation tests alone completes only the proposed-contract implementation, not the Lab 3 product. Checked items cite their evidence; unchecked items are still open and must not be claimed.
 
-- [ ] The four contract documents are internally consistent, peer-reviewed, approved, and merged into `lab3-staging` before production Issue #31 starts.
-- [ ] All included FR and BR behavior is implemented without excluded scope, and all changed APIs and UI behavior match the approved contract.
-- [ ] The data-preserving migration succeeds from a verified Lab 2 database, preserves IDs/relationships/files, and has rollback and initial-password evidence.
-- [ ] The idempotent seed can run repeatedly and produces every required account, credential, Ticket, owner, priority, status, Comment, and Note case without committed secrets.
-- [ ] Authentication, CSRF, session revocation/expiration, role checks, ownership checks, Administrator safety rules, content safety, concurrency, and safe errors have direct automated evidence.
-- [ ] All retained Lab 1 and Lab 2 behavior passes regression tests after replacing selector/header-specific tests with authenticated equivalents.
-- [ ] Every AC maps to a passing automated test or required visual/manual evidence in `tests.md`; no required test is skipped, disabled, commented out, flaky, or unrelated.
-- [ ] Server unit/API/security/migration suites, client UI/style suites, production builds, and Playwright E2E/responsive/accessibility suites pass from the documented clean setup.
-- [ ] Desktop, tablet, mobile, keyboard, 200% zoom, focus, clipping, overlap, badge, editable/read-only, and horizontal-overflow checks pass for every major Lab 3 screen.
-- [ ] Required final screenshots and complete command output are captured from the final integrated behavior and remain readable.
-- [ ] README setup, environment variables, migration, seed, credentials, run, test, storage, cleanup, and security limitations are current and contain no real secrets.
-- [ ] Each feature PR receives peer review, comments and responses are recorded in `reviewer.md`, all features merge into `lab3-staging`, and the tested staging branch merges into `main`.
-- [ ] Submission evidence and the one required PDF are generated from final `main`, use the required Answer Part 1–9 headings, and contain working links and readable evidence.
+- [x] The four contract documents are internally consistent, peer-reviewed, approved, and merged into `lab3-staging` before production Issue #31 starts. Evidence: PR #42 merged before PR #43; DOC-01 in `tests.md`.
+- [x] All included FR and BR behavior is implemented without excluded scope, and all changed APIs and UI behavior match the approved contract. Evidence: FR traceability in `tests.md` section 4; UI conformance fixes in `ui-spec.md` section 12.
+- [ ] The data-preserving migration succeeds from a verified Lab 2 database, preserves IDs/relationships/files, and has rollback and initial-password evidence. Partially met: DB-01 proves the forward migration, preserved records and files, and initial-password credentials; rollback evidence does not exist because Prisma Migrate is forward-only, and recovery relies on restoring a pre-migration backup.
+- [x] The idempotent seed can run repeatedly and produces every required account, credential, Ticket, owner, priority, status, Comment, and Note case without committed secrets. Evidence: DB-02.
+- [x] Authentication, CSRF, session revocation/expiration, role checks, ownership checks, Administrator safety rules, content safety, concurrency, and safe errors have direct automated evidence. Evidence: API-01–API-13, SEC-01–SEC-03, FAIL-01, E2E-01–E2E-04.
+- [x] All retained Lab 1 and Lab 2 behavior passes regression tests after replacing selector/header-specific tests with authenticated equivalents. Evidence: REG-01 and E2E-02.
+- [x] Every AC maps to a passing automated test or required visual/manual evidence in `tests.md`; no required test is skipped, disabled, commented out, flaky, or unrelated. Evidence: `tests.md` sections 3 and 10.
+- [x] Server unit/API/security/migration suites, client UI/style suites, production builds, and Playwright E2E/responsive/accessibility suites pass from the documented clean setup. Evidence: `tests.md` section 10, run twice on the Issue #40 branch; rerun on `lab3-staging` and final `main` under Issue #41.
+- [x] Desktop, tablet, mobile, keyboard, 200% zoom, focus, clipping, overlap, badge, editable/read-only, and horizontal-overflow checks pass for every major Lab 3 screen. Evidence: RESP-01, A11Y-01, STYLE-01, and the `ui-spec.md` section 12 checklist.
+- [ ] Required final screenshots and complete command output are captured from the final integrated behavior and remain readable. Open: screenshots exist under `artifacts/lab-03/screenshots/` from the Issue #40 branch; the final command output and any recapture come from final `main` under Issue #41.
+- [x] README setup, environment variables, migration, seed, credentials, run, test, storage, cleanup, and security limitations are current and contain no real secrets. Evidence: `README.md` updated in Issue #40.
+- [ ] Each feature PR receives peer review, comments and responses are recorded in `reviewer.md`, all features merge into `lab3-staging`, and the tested staging branch merges into `main`. Open: PRs #42–#51 are merged; the Issue #40 PR and the Issue #41 release PR are pending.
+- [ ] Submission evidence and the one required PDF are generated from final `main`, use the required Answer Part 1–9 headings, and contain working links and readable evidence. Open: Issue #41.
 
 ## 11. Assumptions and Decisions
 
@@ -269,20 +269,22 @@ The coding agent must not report Sprint 3 complete until every item below is tru
 - Requester Problem Appears Resolved is limited to Waiting for Requester because that status explicitly asks for Requester input and keeps formal resolution under IT Staff control.
 - Optimistic integer versions are used for mutable Tickets and Users so concurrent actions fail visibly instead of silently overwriting newer state.
 - Local development may omit the cookie Secure flag only on HTTP localhost; deployed HTTPS environments must set Secure and configure the exact allowed client Origin.
-- This document is proposed rather than approved until an actual human peer review occurs; no reviewer identity, comment, approval, PR, merge, or chronology evidence is inferred or fabricated.
+- This document was treated as proposed until a human peer review approved it in PR #42; reviewer identity, comments, responses, and approvals are recorded in `reviewer.md` from GitHub evidence rather than inferred.
 
 ### Reviewer checklist
 
-- [ ] Confirm all four documents agree on role permissions, especially Administrator read-only Ticket visibility and denied IT Staff mutations.
-- [ ] Confirm FR, BR, AC, endpoint, test, and traceability IDs are complete, continuous where required, and free of conflicting definitions.
-- [ ] Confirm every status exists in the transition matrix, every allowed transition names role/owner/confirmation behavior, and every omitted transition is intentionally forbidden.
-- [ ] Confirm authentication, password, session, cookie, CSRF, expiration, throttling, logout, deactivation, reset, and role-change rules are implementable and safely testable.
-- [ ] Confirm Requester cross-owner Ticket, Attachment, Comment, and resolution-signal behavior cannot disclose another Requester's resource existence.
-- [ ] Confirm Administrator self-protection, last-active-Administrator protection, duplicate email, single role, current-owner consistency, and session revocation rules have direct tests.
-- [ ] Confirm migration preserves IDs, Ticket ownership, Attachment audit relationships/files, and initial-password behavior and includes repeatable seed and rollback verification.
-- [ ] Confirm Public Comments and Internal Notes remain distinct in storage, authorization, UI, API, tests, and safe rendering.
-- [ ] Confirm every AC maps to at least one planned test with a real repository target path and that final status is not marked Pass before implementation evidence exists.
-- [ ] Confirm excluded features have not entered any normative requirement and no criterion depends on Actions Taken, email delivery, user deletion, or production infrastructure.
+Completed during the Issue #40 final review against the implemented increment; the evidence for each item is named on its line.
+
+- [x] Confirm all four documents agree on role permissions, especially Administrator read-only Ticket visibility and denied IT Staff mutations. Evidence: SEC-02 role matrix and the Administrator Ticket Review in `ui-spec.md` sections 2 and 7.
+- [x] Confirm FR, BR, AC, endpoint, test, and traceability IDs are complete, continuous where required, and free of conflicting definitions. Evidence: DOC-01.
+- [x] Confirm every status exists in the transition matrix, every allowed transition names role/owner/confirmation behavior, and every omitted transition is intentionally forbidden. Evidence: UNIT-04 and API-10.
+- [x] Confirm authentication, password, session, cookie, CSRF, expiration, throttling, logout, deactivation, reset, and role-change rules are implementable and safely testable. Evidence: API-01, API-02, SEC-01, UNIT-02.
+- [x] Confirm Requester cross-owner Ticket, Attachment, Comment, and resolution-signal behavior cannot disclose another Requester's resource existence. Evidence: SEC-02, API-05, API-06, E2E-02.
+- [x] Confirm Administrator self-protection, last-active-Administrator protection, duplicate email, single role, current-owner consistency, and session revocation rules have direct tests. Evidence: API-13, SEC-03, E2E-04.
+- [ ] Confirm migration preserves IDs, Ticket ownership, Attachment audit relationships/files, and initial-password behavior and includes repeatable seed and rollback verification. Partially met: DB-01 and DB-02 cover everything except rollback, which is not verified because migrations are forward-only.
+- [x] Confirm Public Comments and Internal Notes remain distinct in storage, authorization, UI, API, tests, and safe rendering. Evidence: API-05, API-11, UI-06, E2E-03, VISUAL-01.
+- [x] Confirm every AC maps to at least one planned test with a real repository target path and that final status is not marked Pass before implementation evidence exists. Evidence: `tests.md` sections 2, 3, and 10.
+- [x] Confirm excluded features have not entered any normative requirement and no criterion depends on Actions Taken, email delivery, user deletion, or production infrastructure. Evidence: section 3 scope and SEC-03 (no delete route).
 
 ### Traceability sample
 

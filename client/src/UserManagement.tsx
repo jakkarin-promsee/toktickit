@@ -1,7 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, createUser, CurrentUser, listUsers, setInitialPassword, updateUser, UserRole, UserSummary } from "./api.js";
-
-const ROLE_LABELS: Record<UserRole, string> = { REQUESTER: "Requester", IT_STAFF: "IT Staff", ADMINISTRATOR: "Administrator" };
+import { AccountBadge, describedBy, focusFirstInvalid, ModalDialog, ROLE_LABELS, RoleBadge } from "./ui.js";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function count(value: string) { return Array.from(value).length; }
@@ -17,13 +16,11 @@ type Panel = { mode: "create" } | { mode: "edit"; user: UserSummary } | null;
 
 const EMPTY_FORM: FormState = { displayName: "", email: "", role: "REQUESTER", isActive: true, initialPassword: "", confirmPassword: "" };
 
-function RoleBadge({ role }: { role: UserRole }) { return <span className="badge badge-zen">{ROLE_LABELS[role]}</span>; }
-
 function StatusBadges({ user }: { user: UserSummary }) {
-  return <>
-    <span className="badge badge-priority me-1">{user.isActive ? "Active" : "Inactive"}</span>
-    {user.mustChangePassword && <span className="badge badge-muted">Password change required</span>}
-  </>;
+  return <span className="d-inline-flex flex-wrap gap-1">
+    <AccountBadge state={user.isActive ? "Active" : "Inactive"} />
+    {user.mustChangePassword && <AccountBadge state="Password change required" />}
+  </span>;
 }
 
 export function UserManagement({ user: me }: { user: CurrentUser }) {
@@ -49,6 +46,8 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
   const [resetFailure, setResetFailure] = useState("");
   const [resetting, setResetting] = useState(false);
   const firstField = useRef<HTMLInputElement>(null);
+  const panelForm = useRef<HTMLFormElement>(null);
+  const resetForm = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(searchText.trim()), 300);
@@ -108,9 +107,9 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
   function mapError(error: unknown) {
     const apiError = error as ApiError;
     if (apiError.code === "STALE_USER") { setConflict("stale"); setAlertText("This user changed. Reload before trying again."); return; }
-    if (apiError.fields) setErrors(apiError.fields);
+    if (apiError.fields) { setErrors(apiError.fields); focusFirstInvalid(panelForm.current); }
     if (apiError.code === "USER_OWNS_TICKETS") setAlertText("Reassign owned Tickets before deactivating this user or changing them to Requester.");
-    else if (apiError.code === "EMAIL_ALREADY_EXISTS") setErrors((current) => ({ ...current, email: "A user with this email already exists." }));
+    else if (apiError.code === "EMAIL_ALREADY_EXISTS") { setErrors((current) => ({ ...current, email: "A user with this email already exists." })); focusFirstInvalid(panelForm.current); }
     else setAlertText(apiError.message || "The user could not be saved. Please try again.");
   }
 
@@ -135,7 +134,7 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
     if (saving) return;
     const next = validate();
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) { focusFirstInvalid(panelForm.current); return; }
     if (panel?.mode === "edit" && (form.role !== panel.user.role || form.isActive !== panel.user.isActive)) { setConfirmSave(true); return; }
     void save();
   }
@@ -148,7 +147,7 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
     if (policy) next.password = policy;
     if (reset.confirm !== reset.password) next.confirm = "Passwords do not match.";
     setResetErrors(next); setResetFailure("");
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) { focusFirstInvalid(resetForm.current); return; }
     setResetting(true);
     try {
       await setInitialPassword(panel.user.id, reset.password, me.csrfToken);
@@ -167,8 +166,8 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
 
   if (state === "forbidden") return <section><h1>User Management</h1><div className="alert alert-warning" role="alert">Forbidden. Your account is not permitted to manage users.</div></section>;
 
-  const invalid = (name: string) => ({ className: `form-control${errors[name] ? " is-invalid" : ""}`, "aria-invalid": Boolean(errors[name]), disabled: saving });
-  const fieldError = (name: string) => errors[name] ? <div className="invalid-feedback d-block">{errors[name]}</div> : null;
+  const invalid = (name: string, hint?: string) => ({ className: `form-control${errors[name] ? " is-invalid" : ""}`, "aria-invalid": Boolean(errors[name]), "aria-required": true, "aria-describedby": describedBy(hint, errors[name] && `user-${name}-error`), disabled: saving });
+  const fieldError = (name: string) => errors[name] ? <div id={`user-${name}-error`} className="field-error">{errors[name]}</div> : null;
 
   return (
     <section aria-labelledby="user-management-heading">
@@ -182,8 +181,8 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
         <div className="row g-2">
           <div className="col-12 col-md-6">
             <label htmlFor="user-search" className="form-label">Search users</label>
-            <input id="user-search" type="search" className="form-control" maxLength={120} value={searchText} onChange={(event) => setSearchText(event.target.value)} />
-            <div className="form-text">Name or email</div>
+            <input id="user-search" type="search" className="form-control" aria-describedby="user-search-help" maxLength={120} value={searchText} onChange={(event) => setSearchText(event.target.value)} />
+            <div id="user-search-help" className="form-text">Name or email</div>
           </div>
           <div className="col-12 col-sm-6 col-md-3">
             <label htmlFor="user-role-filter" className="form-label">Role</label>
@@ -192,55 +191,58 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
               {Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </div>
-          <div className="col-12 col-sm-6 col-md-3 d-flex align-items-end"><button type="button" className="btn btn-outline-secondary" onClick={clear}>Clear</button></div>
+          <div className="col-12 col-sm-6 col-md-3 d-flex align-items-end"><button type="button" className="btn btn-outline-secondary w-100" onClick={clear}>Clear</button></div>
         </div>
       </form>
 
       {confirmDiscard && (
-        <div role="dialog" aria-modal="true" aria-labelledby="discard-title" className="card zen-card p-3 mb-3">
+        <ModalDialog labelledBy="discard-title" describedBy="discard-body" onCancel={() => setConfirmDiscard(null)}>
           <h2 id="discard-title" className="h5">Discard changes?</h2>
-          <p>You have unsaved changes that will be lost.</p>
-          <div className="d-flex gap-2"><button className="btn btn-primary" onClick={confirmDiscard}>Discard</button><button className="btn btn-outline-secondary" onClick={() => setConfirmDiscard(null)}>Keep editing</button></div>
-        </div>
+          <p id="discard-body">You have unsaved changes that will be lost.</p>
+          <div className="d-flex flex-wrap gap-2"><button className="btn btn-danger" onClick={confirmDiscard}>Discard</button><button className="btn btn-outline-secondary" data-autofocus onClick={() => setConfirmDiscard(null)}>Keep editing</button></div>
+        </ModalDialog>
       )}
 
       {panel && (
-        <form className="card zen-card p-3 mb-3" aria-labelledby="panel-title" onSubmit={submit} noValidate>
+        <form ref={panelForm} className="card zen-card p-3 mb-3 user-panel" aria-labelledby="panel-title" onSubmit={submit} noValidate>
           <h2 id="panel-title" className="h5">{panel.mode === "create" ? "Create user" : "Edit user"}</h2>
+          <p className="small text-muted">Fields marked with * are required.</p>
           {conflict === "stale" && <div className="alert alert-warning" role="alert">{alertText} <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => { const fresh = users.find((item) => item.id === (panel as { user: UserSummary }).user.id); void listUsers(search, role).then((data) => { setUsers(data); const latest = data.find((item) => item.id === (panel as { user: UserSummary }).user.id) ?? fresh; if (latest) openPanel({ mode: "edit", user: latest }); }); }}>Reload</button></div>}
           {alertText && conflict !== "stale" && <div className="alert alert-danger" role="alert">{alertText}</div>}
-          <div className="mb-3"><label htmlFor="user-name" className="form-label">Display name</label><input id="user-name" ref={firstField} {...invalid("displayName")} value={form.displayName} onChange={(event) => setField("displayName", event.target.value)} />{fieldError("displayName")}</div>
-          <div className="mb-3"><label htmlFor="user-email" className="form-label">Email</label><input id="user-email" type="email" {...invalid("email")} value={form.email} onChange={(event) => setField("email", event.target.value)} />{fieldError("email")}</div>
+          <div className="mb-3"><label htmlFor="user-name" className="form-label required">Display name</label><input id="user-name" ref={firstField} {...invalid("displayName")} value={form.displayName} onChange={(event) => setField("displayName", event.target.value)} />{fieldError("displayName")}</div>
+          <div className="mb-3"><label htmlFor="user-email" className="form-label required">Email</label><input id="user-email" type="email" {...invalid("email")} value={form.email} onChange={(event) => setField("email", event.target.value)} />{fieldError("email")}</div>
           <div className="mb-3">
-            <label htmlFor="user-role" className="form-label">Role</label>
-            <select id="user-role" className={`form-select${errors.role ? " is-invalid" : ""}`} value={form.role} disabled={saving || editingSelf} onChange={(event) => setField("role", event.target.value as UserRole)}>
+            <label htmlFor="user-role" className="form-label required">Role</label>
+            <select id="user-role" className={`form-select${errors.role ? " is-invalid" : ""}`} aria-required="true" aria-describedby={describedBy(editingSelf && "self-protection-note", errors.role && "user-role-error")} value={form.role} disabled={saving || editingSelf} onChange={(event) => setField("role", event.target.value as UserRole)}>
               {Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
             {fieldError("role")}
           </div>
           <div className="form-check mb-3">
-            <input id="user-active" type="checkbox" className="form-check-input" checked={form.isActive} disabled={saving || editingSelf} onChange={(event) => setField("isActive", event.target.checked)} />
+            <input id="user-active" type="checkbox" className="form-check-input" aria-describedby={editingSelf ? "self-protection-note" : undefined} checked={form.isActive} disabled={saving || editingSelf} onChange={(event) => setField("isActive", event.target.checked)} />
             <label htmlFor="user-active" className="form-check-label">Active</label>
           </div>
-          {editingSelf && <p className="small text-muted">You cannot change your own role or deactivate your own account.</p>}
+          {editingSelf && <p id="self-protection-note" className="small text-muted">You cannot change your own role or deactivate your own account.</p>}
           {panel.mode === "create" ? (
             <>
-              <div className="mb-3"><label htmlFor="user-password" className="form-label">Initial password</label><input id="user-password" type="password" autoComplete="new-password" {...invalid("initialPassword")} value={form.initialPassword} onChange={(event) => setField("initialPassword", event.target.value)} />{fieldError("initialPassword")}<div className="form-text">12–128 characters with lowercase, uppercase, digit, and symbol. The user must change it at first login.</div></div>
-              <div className="mb-3"><label htmlFor="user-confirm" className="form-label">Confirm initial password</label><input id="user-confirm" type="password" autoComplete="new-password" {...invalid("confirmPassword")} value={form.confirmPassword} onChange={(event) => setField("confirmPassword", event.target.value)} />{fieldError("confirmPassword")}</div>
+              <div className="mb-3"><label htmlFor="user-password" className="form-label required">Initial password</label><input id="user-password" type="password" autoComplete="new-password" {...invalid("initialPassword", "user-password-help")} value={form.initialPassword} onChange={(event) => setField("initialPassword", event.target.value)} />{fieldError("initialPassword")}<div id="user-password-help" className="form-text">12–128 characters with lowercase, uppercase, digit, and symbol. The user must change it at first login.</div></div>
+              <div className="mb-3"><label htmlFor="user-confirm" className="form-label required">Confirm initial password</label><input id="user-confirm" type="password" autoComplete="new-password" {...invalid("confirmPassword")} value={form.confirmPassword} onChange={(event) => setField("confirmPassword", event.target.value)} />{fieldError("confirmPassword")}</div>
             </>
           ) : (
-            <p>Password change required: <strong>{panel.user.mustChangePassword ? "Yes" : "No"}</strong></p>
+            <p>Password change required (read-only): <span className="readonly-inline">{panel.user.mustChangePassword ? "Yes" : "No"}</span></p>
           )}
           {confirmSave && panel.mode === "edit" && (
-            <div role="dialog" aria-modal="true" aria-labelledby="save-confirm-title" className="alert alert-warning">
-              <h3 id="save-confirm-title" className="h6">Confirm role or status change</h3>
-              <p>Changing the role or active state of {panel.user.displayName} ends all of their current sessions.</p>
-              <button type="button" className="btn btn-primary me-2" onClick={() => void save()}>Confirm</button>
-              <button type="button" className="btn btn-outline-secondary" onClick={() => setConfirmSave(false)}>Cancel</button>
-            </div>
+            <ModalDialog labelledBy="save-confirm-title" describedBy="save-confirm-body" onCancel={() => setConfirmSave(false)}>
+              <h2 id="save-confirm-title" className="h5">Confirm role or status change</h2>
+              <p id="save-confirm-body">Changing the role or active state of {panel.user.displayName} ends all of their current sessions.</p>
+              <div className="d-flex flex-wrap gap-2">
+                <button type="button" className="btn btn-primary" onClick={() => void save()}>Confirm</button>
+                <button type="button" className="btn btn-outline-secondary" data-autofocus onClick={() => setConfirmSave(false)}>Cancel</button>
+              </div>
+            </ModalDialog>
           )}
           <div className="d-flex flex-wrap gap-2">
-            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : panel.mode === "create" ? "Create user" : "Save changes"}</button>
+            <button type="submit" className="btn btn-primary" disabled={saving} aria-busy={saving}>{saving ? "Saving…" : panel.mode === "create" ? "Create user" : "Save changes"}</button>
             {panel.mode === "edit" && <button type="button" className="btn btn-outline-primary" disabled={saving} onClick={() => { setResetOpen(true); setReset({ password: "", confirm: "" }); setResetErrors({}); setResetFailure(""); }}>Set new initial password</button>}
             <button type="button" className="btn btn-outline-secondary" disabled={saving} onClick={closePanel}>Cancel</button>
           </div>
@@ -248,21 +250,23 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
       )}
 
       {resetOpen && panel?.mode === "edit" && (
-        <form role="dialog" aria-modal="true" aria-labelledby="reset-title" className="card zen-card p-3 mb-3" onSubmit={(event) => void submitReset(event)} noValidate>
+        <ModalDialog labelledBy="reset-title" describedBy="reset-warning" onCancel={() => { if (!resetting) setResetOpen(false); }}>
+        <form ref={resetForm} onSubmit={(event) => void submitReset(event)} noValidate>
           <h2 id="reset-title" className="h5">Set new initial password for {panel.user.displayName}</h2>
-          <p className="alert alert-warning">All current sessions for this user will end, and they must change this password at next login.</p>
+          <p id="reset-warning" className="alert alert-warning">All current sessions for this user will end, and they must change this password at next login.</p>
           {resetFailure && <div className="alert alert-danger" role="alert">{resetFailure}</div>}
-          <div className="mb-3"><label htmlFor="reset-password" className="form-label">New initial password</label><input id="reset-password" type="password" autoComplete="new-password" className={`form-control${resetErrors.password ? " is-invalid" : ""}`} value={reset.password} disabled={resetting} onChange={(event) => setReset({ ...reset, password: event.target.value })} />{resetErrors.password && <div className="invalid-feedback d-block">{resetErrors.password}</div>}</div>
-          <div className="mb-3"><label htmlFor="reset-confirm" className="form-label">Confirm new initial password</label><input id="reset-confirm" type="password" autoComplete="new-password" className={`form-control${resetErrors.confirm ? " is-invalid" : ""}`} value={reset.confirm} disabled={resetting} onChange={(event) => setReset({ ...reset, confirm: event.target.value })} />{resetErrors.confirm && <div className="invalid-feedback d-block">{resetErrors.confirm}</div>}</div>
-          <div className="d-flex gap-2"><button type="submit" className="btn btn-primary" disabled={resetting}>{resetting ? "Saving…" : "Set password"}</button><button type="button" className="btn btn-outline-secondary" disabled={resetting} onClick={() => setResetOpen(false)}>Cancel</button></div>
+          <div className="mb-3"><label htmlFor="reset-password" className="form-label required">New initial password</label><input id="reset-password" type="password" autoComplete="new-password" className={`form-control${resetErrors.password ? " is-invalid" : ""}`} aria-required="true" aria-invalid={Boolean(resetErrors.password)} aria-describedby={describedBy("reset-password-help", resetErrors.password && "reset-password-error")} value={reset.password} disabled={resetting} onChange={(event) => setReset({ ...reset, password: event.target.value })} />{resetErrors.password && <div id="reset-password-error" className="field-error">{resetErrors.password}</div>}<div id="reset-password-help" className="form-text">12–128 characters with lowercase, uppercase, digit, and symbol.</div></div>
+          <div className="mb-3"><label htmlFor="reset-confirm" className="form-label required">Confirm new initial password</label><input id="reset-confirm" type="password" autoComplete="new-password" className={`form-control${resetErrors.confirm ? " is-invalid" : ""}`} aria-required="true" aria-invalid={Boolean(resetErrors.confirm)} aria-describedby={describedBy(resetErrors.confirm && "reset-confirm-error")} value={reset.confirm} disabled={resetting} onChange={(event) => setReset({ ...reset, confirm: event.target.value })} />{resetErrors.confirm && <div id="reset-confirm-error" className="field-error">{resetErrors.confirm}</div>}</div>
+          <div className="d-flex flex-wrap gap-2"><button type="submit" className="btn btn-primary" disabled={resetting} aria-busy={resetting}>{resetting ? "Saving…" : "Set password"}</button><button type="button" className="btn btn-outline-secondary" disabled={resetting} onClick={() => setResetOpen(false)}>Cancel</button></div>
         </form>
+        </ModalDialog>
       )}
 
       {state === "loading" && <p role="status">Loading users…</p>}
       {state === "failed" && <div className="alert alert-danger" role="alert">Users could not be loaded. <button className="btn btn-sm btn-outline-secondary" onClick={retry}>Retry</button></div>}
       {state === "ready" && users.length === 0 && (filtered
         ? <div className="card zen-card p-3"><h2 className="h5">No users match</h2><p>No user matches the current search or role filter.</p><div><button className="btn btn-outline-secondary" onClick={clear}>Clear</button></div></div>
-        : <p>No users exist yet. Use Create user to add the first one.</p>)}
+        : <p className="card zen-card p-3">No users exist yet. Use Create user to add the first one.</p>)}
 
       {state === "ready" && users.length > 0 && (
         <>
@@ -273,7 +277,7 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
               <tbody>
                 {users.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.displayName}</td><td className="queue-summary">{item.email}</td><td><RoleBadge role={item.role} /></td><td><StatusBadges user={item} /></td>
+                    <td>{item.displayName}</td><td className="text-break">{item.email}</td><td><RoleBadge role={item.role} /></td><td><StatusBadges user={item} /></td>
                     <td><button className="btn btn-sm btn-outline-primary" aria-label={`Edit ${item.displayName}`} onClick={() => openPanel({ mode: "edit", user: item })}>Edit</button></td>
                   </tr>
                 ))}
@@ -284,7 +288,7 @@ export function UserManagement({ user: me }: { user: CurrentUser }) {
             {users.map((item) => (
               <li key={item.id} className="card zen-card p-3 mb-2">
                 <strong>{item.displayName}</strong>
-                <div className="queue-summary">{item.email}</div>
+                <div className="text-break">{item.email}</div>
                 <div className="my-1"><RoleBadge role={item.role} /></div>
                 <div className="my-1"><StatusBadges user={item} /></div>
                 <div><button className="btn btn-sm btn-outline-primary" aria-label={`Edit ${item.displayName}`} onClick={() => openPanel({ mode: "edit", user: item })}>Edit</button></div>
