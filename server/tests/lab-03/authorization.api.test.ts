@@ -77,3 +77,100 @@ describe("SEC-02 Issue #33 authorization boundaries", () => {
     expect((await admin.agent.get("/api/staff/assignees")).status).toBe(403);
   });
 });
+
+const staffTicketId = "31000000-0000-4000-8000-000000000002";
+
+describe("SEC-01 Issue #38 CSRF and Origin checks", () => {
+  it("rejects missing, wrong, cross-session, and disallowed-Origin writes and allows safe GETs without a token", async () => {
+    const first = await signedInAgent("anan@example.test");
+    const second = await signedInAgent("anan@example.test");
+    const comment = { content: "Issue 38 CSRF probe comment." };
+    const path = "/api/tickets/31000000-0000-4000-8000-000000000001/comments";
+    const before = await prisma.publicComment.count();
+    const attempts = [
+      first.agent.post(path).set("Origin", origin).send(comment),
+      first.agent.post(path).set("Origin", origin).set("X-CSRF-Token", "b".repeat(64)).send(comment),
+      first.agent.post(path).set("Origin", origin).set("X-CSRF-Token", second.csrfToken).send(comment),
+      first.agent.post(path).set("Origin", "http://evil.example").set("X-CSRF-Token", first.csrfToken).send(comment),
+      first.agent.post(path).set("X-CSRF-Token", first.csrfToken).send(comment),
+    ];
+    for (const response of await Promise.all(attempts)) {
+      expect(response.status).toBe(403);
+      expect(response.body.error.code).toBe("CSRF_INVALID");
+    }
+    expect(await prisma.publicComment.count()).toBe(before);
+    expect((await first.agent.get(path)).status).toBe(200);
+  });
+});
+
+describe("SEC-02 Issue #38 direct API role matrix", () => {
+  it("allows only the matrix-permitted role for each protected operation", async () => {
+    const sessions = {
+      REQUESTER: await signedInAgent("anan@example.test"),
+      IT_STAFF: await signedInAgent("narin.staff@example.test"),
+      ADMINISTRATOR: await signedInAgent("araya.admin@example.test"),
+    };
+    type Role = keyof typeof sessions;
+    const headers = (role: Role) => ({ Origin: origin, "X-CSRF-Token": sessions[role].csrfToken });
+    const matrix: { name: string; allowed: Role[]; call: (role: Role) => Promise<{ status: number; body: unknown }> }[] = [
+      { name: "GET my tickets", allowed: ["REQUESTER"], call: (role) => sessions[role].agent.get("/api/tickets") },
+      { name: "GET staff queue", allowed: ["IT_STAFF", "ADMINISTRATOR"], call: (role) => sessions[role].agent.get("/api/staff/tickets") },
+      { name: "GET staff detail", allowed: ["IT_STAFF", "ADMINISTRATOR"], call: (role) => sessions[role].agent.get(`/api/staff/tickets/${staffTicketId}`) },
+      { name: "GET internal notes", allowed: ["IT_STAFF", "ADMINISTRATOR"], call: (role) => sessions[role].agent.get(`/api/staff/tickets/${staffTicketId}/internal-notes`) },
+      { name: "GET assignees", allowed: ["IT_STAFF"], call: (role) => sessions[role].agent.get("/api/staff/assignees") },
+      { name: "PATCH IT priority (malformed body)", allowed: ["IT_STAFF"], call: (role) => sessions[role].agent.patch(`/api/staff/tickets/${staffTicketId}/it-priority`).set(headers(role)).send({}) },
+      { name: "POST internal note (empty)", allowed: ["IT_STAFF"], call: (role) => sessions[role].agent.post(`/api/staff/tickets/${staffTicketId}/internal-notes`).set(headers(role)).send({ content: " " }) },
+      { name: "GET admin users", allowed: ["ADMINISTRATOR"], call: (role) => sessions[role].agent.get("/api/admin/users") },
+      { name: "POST admin user (empty)", allowed: ["ADMINISTRATOR"], call: (role) => sessions[role].agent.post("/api/admin/users").set(headers(role)).send({}) },
+    ];
+    for (const row of matrix) {
+      for (const role of Object.keys(sessions) as Role[]) {
+        const response = await row.call(role);
+        if (row.allowed.includes(role)) {
+          expect(response.status, `${row.name} as ${role}`).not.toBe(403);
+          expect(response.status, `${row.name} as ${role}`).not.toBe(401);
+        } else {
+          expect(response.status, `${row.name} as ${role}`).toBe(403);
+          expect(response.body, `${row.name} as ${role}`).toEqual({ error: { code: "FORBIDDEN", message: "You do not have permission to perform this action." } });
+        }
+      }
+    }
+  });
+
+  it("returns 401 for every protected family without a session", async () => {
+    for (const path of ["/api/tickets", "/api/staff/tickets", `/api/staff/tickets/${staffTicketId}`, `/api/staff/tickets/${staffTicketId}/internal-notes`, "/api/admin/users", "/api/auth/me", "/api/app"]) {
+      const response = await request(app).get(path);
+      expect(response.status, path).toBe(401);
+      expect(JSON.stringify(response.body)).not.toMatch(/TKT-|@example\.test/);
+    }
+  });
+});
+
+describe("SEC-02 Issue #38 cross-feature authentication, administration, and workflow", () => {
+  it("revokes a Staff session when an Administrator changes the role, and the new Requester cannot reach Staff operations", async () => {
+    const admin = await signedInAgent("araya.admin@example.test");
+    const created = await admin.agent.post("/api/admin/users").set("Origin", origin).set("X-CSRF-Token", admin.csrfToken).send({ displayName: "Issue 38 Cross Feature", email: `issue38-cross-${Date.now()}@example.test`, role: "IT_STAFF", isActive: true, initialPassword: "Cross!Feature-38" });
+    expect(created.status).toBe(201);
+    const staffAgent = request.agent(app);
+    const login = await staffAgent.post("/api/auth/login").set("Origin", origin).send({ email: created.body.data.email, password: "Cross!Feature-38" });
+    expect(login.body.data.mustChangePassword).toBe(true);
+    expect((await staffAgent.get("/api/staff/tickets")).status).toBe(403);
+    const changed = await staffAgent.post("/api/auth/change-password").set("Origin", origin).set("X-CSRF-Token", login.body.data.csrfToken).send({ currentPassword: "Cross!Feature-38", newPassword: "Cross!Changed-38" });
+    expect(changed.status).toBe(200);
+    expect((await staffAgent.get("/api/staff/tickets")).status).toBe(200);
+
+    const demoted = await admin.agent.patch(`/api/admin/users/${created.body.data.id}`).set("Origin", origin).set("X-CSRF-Token", admin.csrfToken).send({ displayName: "Issue 38 Cross Feature", email: created.body.data.email, role: "REQUESTER", isActive: true, version: created.body.data.version });
+    expect(demoted.status, JSON.stringify(demoted.body)).toBe(200);
+    expect((await staffAgent.get("/api/staff/tickets")).status).toBe(401);
+
+    const requesterAgent = request.agent(app);
+    expect((await requesterAgent.post("/api/auth/login").set("Origin", origin).send({ email: created.body.data.email, password: "Cross!Changed-38" })).status).toBe(200);
+    expect((await requesterAgent.get("/api/staff/tickets")).status).toBe(403);
+    expect((await requesterAgent.get(`/api/staff/tickets/${staffTicketId}/internal-notes`)).status).toBe(403);
+    expect((await requesterAgent.get("/api/tickets")).status).toBe(200);
+
+    await prisma.session.deleteMany({ where: { userId: created.body.data.id } });
+    await prisma.credential.deleteMany({ where: { userId: created.body.data.id } });
+    await prisma.user.delete({ where: { id: created.body.data.id } });
+  });
+});
