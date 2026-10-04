@@ -1,4 +1,4 @@
-import { FormEvent, MouseEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError,
   attachmentDownloadUrl,
@@ -17,30 +17,13 @@ import {
   PublicComment,
   TicketDetail,
   TicketListItem,
-  TicketStatus,
 } from "./api.js";
+import { describedBy, focusFirstInvalid, ModalDialog, PRIORITY_LABELS, PriorityBadge, StatusBadge } from "./ui.js";
 
 const MAX_COMMENT = 2000;
 
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  NEW: "New",
-  OPEN: "Open",
-  IN_PROGRESS: "In Progress",
-  WAITING_FOR_REQUESTER: "Waiting for Requester",
-  RESOLVED: "Resolved",
-  CLOSED: "Closed",
-  REOPENED: "Reopened",
-  CANCELLED: "Cancelled",
-};
-
-const PRIORITY_LABELS: Record<string, string> = { LOW: "Low", MEDIUM: "Medium", HIGH: "High" };
-
 function formatTime(value: string) {
   return new Date(value).toLocaleString();
-}
-
-function StatusBadge({ status }: { status: TicketStatus }) {
-  return <span className="badge badge-zen">{STATUS_LABELS[status]}</span>;
 }
 
 export function MyTickets({ onOpen }: { onOpen: (event: MouseEvent<HTMLAnchorElement>, ticketId: string) => void }) {
@@ -56,13 +39,13 @@ export function MyTickets({ onOpen }: { onOpen: (event: MouseEvent<HTMLAnchorEle
       <h1 id="my-tickets-heading">My Tickets</h1>
       {state === "loading" && <p role="status">Loading tickets…</p>}
       {state === "failed" && <div className="alert alert-danger" role="alert">Tickets could not be loaded. <button className="btn btn-sm btn-outline-secondary" onClick={load}>Retry</button></div>}
-      {state === "ready" && tickets.length === 0 && <p>You have not submitted any tickets yet.</p>}
+      {state === "ready" && tickets.length === 0 && <p className="card zen-card p-3">You have not submitted any tickets yet.</p>}
       {state === "ready" && tickets.length > 0 && (
         <ul className="list-unstyled">
           {tickets.map((ticket) => (
             <li key={ticket.id} className="card zen-card p-3 mb-2">
-              <a href={`/tickets/${ticket.id}`} onClick={(event) => onOpen(event, ticket.id)}>{ticket.ticketNumber} · {ticket.summary}</a>
-              <div className="mt-1"><StatusBadge status={ticket.currentStatus} /> <span className="badge badge-priority">Requested: {PRIORITY_LABELS[ticket.requestedPriority]}</span></div>
+              <a href={`/tickets/${ticket.id}`} className="ticket-link" onClick={(event) => onOpen(event, ticket.id)}>{ticket.ticketNumber} · {ticket.summary}</a>
+              <div className="mt-1 d-flex flex-wrap gap-1"><StatusBadge status={ticket.currentStatus} /> <PriorityBadge kind="Requested" priority={ticket.requestedPriority} /></div>
             </li>
           ))}
         </ul>
@@ -138,9 +121,10 @@ export function RequesterTicketDetail({ ticketId, user, onBack }: { ticketId: st
   return (
     <article className="requester-detail">
       <a href="/tickets" onClick={onBack}>Back to My Tickets</a>
-      <h1 className="mt-2">{ticket.summary}</h1>
+      <h1 className="mt-2 text-break">{ticket.summary}</h1>
       <section className="card zen-card p-3 mb-3" aria-label="Ticket information">
-        <dl className="mb-0">
+        <h2 className="h5">Ticket information <span className="field-mode">Read-only</span></h2>
+        <dl className="mb-0 readonly-fields">
           <dt>Ticket Number</dt><dd>{ticket.ticketNumber}</dd>
           <dt>Status</dt><dd><StatusBadge status={ticket.currentStatus} /></dd>
           <dt>Category</dt><dd>{ticket.category.name}</dd>
@@ -173,14 +157,14 @@ export function RequesterTicketDetail({ ticketId, user, onBack }: { ticketId: st
         </section>
       )}
       {confirming && (
-        <div role="dialog" aria-modal="true" aria-labelledby="confirm-resolved-title" className="card zen-card p-3 mb-3">
+        <ModalDialog labelledBy="confirm-resolved-title" describedBy="confirm-resolved-body" onCancel={() => { if (!resolving) setConfirming(false); }}>
           <h2 id="confirm-resolved-title" className="h5">Confirm</h2>
-          <p>Tell support the problem on {ticket.ticketNumber} appears resolved? Support must still resolve or close the Ticket.</p>
-          <div className="d-flex gap-2">
-            <button className="btn btn-primary" onClick={() => void confirmResolved()} disabled={resolving}>{resolving ? "Saving…" : "Confirm"}</button>
-            <button className="btn btn-outline-secondary" onClick={() => setConfirming(false)} disabled={resolving}>Cancel</button>
+          <p id="confirm-resolved-body">Tell support the problem on {ticket.ticketNumber} appears resolved? Support must still resolve or close the Ticket.</p>
+          <div className="d-flex flex-wrap gap-2">
+            <button className="btn btn-primary" onClick={() => void confirmResolved()} disabled={resolving} aria-busy={resolving}>{resolving ? "Saving…" : "Confirm"}</button>
+            <button className="btn btn-outline-secondary" data-autofocus onClick={() => setConfirming(false)} disabled={resolving}>Cancel</button>
           </div>
-        </div>
+        </ModalDialog>
       )}
 
       <section className="card zen-card p-3" aria-labelledby="comments-heading">
@@ -197,9 +181,9 @@ export function RequesterTicketDetail({ ticketId, user, onBack }: { ticketId: st
         )}
         <form onSubmit={(event) => void submitComment(event)} noValidate>
           <label htmlFor="new-comment" className="form-label">Add public comment</label>
-          <textarea id="new-comment" className={`form-control${draftError ? " is-invalid" : ""}`} rows={4} value={draft} disabled={posting} aria-describedby="comment-help comment-error" aria-invalid={Boolean(draftError)} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} />
+          <textarea id="new-comment" className={`form-control${draftError ? " is-invalid" : ""}`} rows={4} value={draft} disabled={posting} aria-describedby={describedBy("comment-help", draftError && "comment-error")} aria-invalid={Boolean(draftError)} onChange={(event) => { setDraft(event.target.value); setDraftError(""); }} />
           <div id="comment-help" className="form-text">Visible to you and support staff · {Array.from(draft).length}/{MAX_COMMENT}</div>
-          {draftError && <div id="comment-error" className="invalid-feedback d-block">{draftError}</div>}
+          {draftError && <div id="comment-error" className="field-error">{draftError}</div>}
           {postFailure && <div className="alert alert-danger mt-2" role="alert">{postFailure}</div>}
           {postSuccess && <div className="alert alert-success mt-2" role="status">{postSuccess}</div>}
           <button type="submit" className="btn btn-primary mt-2" disabled={posting}>{posting ? "Posting…" : "Post comment"}</button>
@@ -217,6 +201,7 @@ export function CreateTicket({ user, onCreated }: { user: CurrentUser; onCreated
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState("");
   const [busy, setBusy] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const load = useCallback(() => {
     setLoadState("loading");
@@ -242,14 +227,14 @@ export function CreateTicket({ user, onCreated }: { user: CurrentUser; onCreated
     if (Array.from(summary).length < 5 || Array.from(summary).length > 120) next.summary = "Summary must contain 5–120 characters.";
     if (Array.from(description).length < 10 || Array.from(description).length > 2000) next.description = "Description must contain 10–2,000 characters.";
     setErrors(next); setFailure("");
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) { focusFirstInvalid(formRef.current); return; }
     setBusy(true);
     try {
       const created = await createTicket({ categoryId: Number(form.categoryId), relatedSystemId: Number(form.relatedSystemId), summary, requestedPriority: form.requestedPriority as RequestedPriority, description }, user.csrfToken);
       onCreated(created.id);
     } catch (error) {
       const failed = error as Error & { fields?: Record<string, string> };
-      if (failed.fields) setErrors(failed.fields);
+      if (failed.fields) { setErrors(failed.fields); focusFirstInvalid(formRef.current); }
       setFailure(failed.message || "Ticket could not be created. Please try again.");
       setBusy(false);
     }
@@ -257,24 +242,25 @@ export function CreateTicket({ user, onCreated }: { user: CurrentUser; onCreated
 
   if (loadState === "loading") return <p role="status">Loading form…</p>;
   if (loadState === "failed") return <div className="alert alert-danger" role="alert">The form could not be loaded. <button className="btn btn-sm btn-outline-secondary" onClick={load}>Retry</button></div>;
-  const field = (name: string) => ({ className: `form-control${errors[name] ? " is-invalid" : ""}`, "aria-invalid": Boolean(errors[name]), disabled: busy });
-  const error = (name: string) => errors[name] ? <div className="invalid-feedback d-block">{errors[name]}</div> : null;
+  const field = (name: string, required = true) => ({ className: `form-control${errors[name] ? " is-invalid" : ""}`, "aria-invalid": Boolean(errors[name]), "aria-required": required, "aria-describedby": describedBy(errors[name] && `${name}-error`), disabled: busy });
+  const error = (name: string) => errors[name] ? <div id={`${name}-error`} className="field-error">{errors[name]}</div> : null;
   return (
     <section aria-labelledby="create-ticket-heading">
       <h1 id="create-ticket-heading">Create Ticket</h1>
-      <form className="card zen-card p-3" onSubmit={(event) => void submit(event)} noValidate>
-        <div className="mb-3"><label htmlFor="category" className="form-label">Category</label>
-          <select id="category" {...field("categoryId")} value={form.categoryId} onChange={(event) => set("categoryId", event.target.value)}><option value="">Select…</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{error("categoryId")}</div>
-        <div className="mb-3"><label htmlFor="related-system" className="form-label">Related System</label>
-          <select id="related-system" {...field("relatedSystemId")} value={form.relatedSystemId} onChange={(event) => set("relatedSystemId", event.target.value)}><option value="">Select…</option>{systems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{error("relatedSystemId")}</div>
-        <div className="mb-3"><label htmlFor="summary" className="form-label">Summary</label>
+      <form ref={formRef} className="card zen-card p-3" onSubmit={(event) => void submit(event)} noValidate>
+        <p className="small text-muted">Fields marked with * are required.</p>
+        <div className="mb-3"><label htmlFor="category" className="form-label required">Category</label>
+          <select id="category" {...field("categoryId")} className={`form-select${errors.categoryId ? " is-invalid" : ""}`} value={form.categoryId} onChange={(event) => set("categoryId", event.target.value)}><option value="">Select…</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{error("categoryId")}</div>
+        <div className="mb-3"><label htmlFor="related-system" className="form-label required">Related System</label>
+          <select id="related-system" {...field("relatedSystemId")} className={`form-select${errors.relatedSystemId ? " is-invalid" : ""}`} value={form.relatedSystemId} onChange={(event) => set("relatedSystemId", event.target.value)}><option value="">Select…</option>{systems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{error("relatedSystemId")}</div>
+        <div className="mb-3"><label htmlFor="summary" className="form-label required">Summary</label>
           <input id="summary" {...field("summary")} value={form.summary} onChange={(event) => set("summary", event.target.value)} />{error("summary")}</div>
-        <div className="mb-3"><label htmlFor="priority" className="form-label">Requested Priority</label>
-          <select id="priority" {...field("requestedPriority")} value={form.requestedPriority} onChange={(event) => set("requestedPriority", event.target.value)}><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></div>
-        <div className="mb-3"><label htmlFor="description" className="form-label">Description</label>
-          <textarea id="description" rows={5} {...field("description")} value={form.description} onChange={(event) => set("description", event.target.value)} />{error("description")}</div>
+        <div className="mb-3"><label htmlFor="priority" className="form-label required">Requested Priority</label>
+          <select id="priority" {...field("requestedPriority")} className={`form-select${errors.requestedPriority ? " is-invalid" : ""}`} value={form.requestedPriority} onChange={(event) => set("requestedPriority", event.target.value)}><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></div>
+        <div className="mb-3"><label htmlFor="description" className="form-label required">Description</label>
+          <textarea id="description" rows={6} {...field("description")} value={form.description} onChange={(event) => set("description", event.target.value)} />{error("description")}</div>
         {failure && <div className="alert alert-danger" role="alert">{failure}</div>}
-        <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Submitting…" : "Submit ticket"}</button>
+        <button type="submit" className="btn btn-primary align-self-start" disabled={busy} aria-busy={busy}>{busy ? "Submitting…" : "Submit ticket"}</button>
       </form>
     </section>
   );

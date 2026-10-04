@@ -1,22 +1,19 @@
-import { FormEvent, MouseEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, KeyboardEvent, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError, attachmentDownloadUrl, CurrentUser, getAssignees, getStaffTicketDetail, PersonRef, postInternalNote, postTicketComment,
-  PublicComment, RequestedPriority, staffMutation, StaffTicketDetail as Detail, TicketStatus,
+  PublicComment, RequestedPriority, staffMutation, StaffTicketDetail as Detail,
 } from "./api.js";
 import { nextStatuses } from "./statusTransitions.js";
+import { describedBy, ModalDialog, PRIORITY_LABELS, PriorityBadge, STATUS_LABELS, StatusBadge } from "./ui.js";
 
 const MAX_TEXT = 2000;
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  NEW: "New", OPEN: "Open", IN_PROGRESS: "In Progress", WAITING_FOR_REQUESTER: "Waiting for Requester",
-  RESOLVED: "Resolved", CLOSED: "Closed", REOPENED: "Reopened", CANCELLED: "Cancelled",
-};
-const PRIORITY_LABELS: Record<string, string> = { LOW: "Low", MEDIUM: "Medium", HIGH: "High" };
+const TABS = [["public", "Public Comments"], ["internal", "Internal Notes"], ["attachments", "Attachments"]] as const;
 const STALE_MESSAGE = "This Ticket changed. Refresh before trying again.";
 
 type Card = "owner" | "priority" | "status";
 type Tab = "public" | "internal" | "attachments";
 interface Feedback { card: string; kind: "success" | "error"; text: string; fields?: Record<string, string> }
-interface Confirmation { title: string; body: string; run: () => void }
+interface Confirmation { title: string; body: string; run: () => void; danger?: boolean }
 
 function formatTime(value: string) { return new Date(value).toLocaleString(); }
 
@@ -34,7 +31,7 @@ function Entries({ items, empty }: { items: PublicComment[]; empty: string }) {
   );
 }
 
-export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string; user: CurrentUser; onBack: (event: MouseEvent<HTMLAnchorElement>) => void }) {
+export function StaffTicketDetail({ ticketId, user, onBack, backLabel = "Back to Ticket Queue" }: { ticketId: string; user: CurrentUser; onBack: (event: MouseEvent<HTMLAnchorElement>) => void; backLabel?: string }) {
   const readOnly = user.role !== "IT_STAFF";
   const [state, setState] = useState<"loading" | "ready" | "notFound" | "forbidden" | "failed">("loading");
   const [loadError, setLoadError] = useState("");
@@ -50,6 +47,16 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
   const [drafts, setDrafts] = useState({ public: "", internal: "" });
   const [draftErrors, setDraftErrors] = useState({ public: "", internal: "" });
   const [postFailure, setPostFailure] = useState<{ public: string; internal: string }>({ public: "", internal: "" });
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ public: null, internal: null, attachments: null });
+
+  // Arrow keys, Home, and End move between tabs (WAI-ARIA tabs pattern with roving tabindex).
+  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const order = TABS.map(([id]) => id);
+    const index = order.indexOf(tab);
+    const next = event.key === "ArrowRight" ? order[(index + 1) % order.length] : event.key === "ArrowLeft" ? order[(index + order.length - 1) % order.length] : event.key === "Home" ? order[0] : event.key === "End" ? order[order.length - 1] : null;
+    if (!next) return;
+    event.preventDefault(); setTab(next); tabRefs.current[next]?.focus();
+  }
 
   const load = useCallback(() => {
     setState("loading"); setLoadError(""); setStale(false);
@@ -103,7 +110,7 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
   }
 
   if (state === "loading") return <p role="status">Loading ticket…</p>;
-  if (state === "notFound") return <><p role="alert">We couldn't find this ticket.</p><a href="/staff/tickets" onClick={onBack}>Back to Ticket Queue</a></>;
+  if (state === "notFound") return <><p role="alert">We couldn't find this ticket.</p><a href="/staff/tickets" onClick={onBack}>{backLabel}</a></>;
   if (state === "forbidden") return <p className="alert alert-warning" role="alert">Forbidden. Your account is not permitted to view this Ticket.</p>;
   if (state === "failed" || !ticket) return <div className="alert alert-danger" role="alert">{loadError} <button className="btn btn-sm btn-outline-secondary" onClick={load}>Retry</button></div>;
 
@@ -113,13 +120,13 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
 
   return (
     <article className="staff-detail">
-      <a href="/staff/tickets" onClick={onBack}>Back to Ticket Queue</a>
-      <h1 className="mt-2">{ticket.ticketNumber}</h1>
-      <p className="mb-2">
-        <span className="badge badge-zen me-1">{STATUS_LABELS[ticket.currentStatus]}</span>
-        <span className="badge badge-priority me-1">Requested: {PRIORITY_LABELS[ticket.requestedPriority]}</span>
-        <span className="badge badge-priority me-1">IT: {PRIORITY_LABELS[ticket.itPriority]}</span>
-        {ticket.owner ? <span className="badge badge-muted">Owner: {ticket.owner.displayName}</span> : <span className="badge badge-muted">Unassigned</span>}
+      <a href="/staff/tickets" onClick={onBack}>{backLabel}</a>
+      <h1 className="mt-2 text-break">{ticket.ticketNumber}</h1>
+      <p className="mb-2 d-flex flex-wrap gap-1">
+        <StatusBadge status={ticket.currentStatus} />
+        <PriorityBadge kind="Requested" priority={ticket.requestedPriority} />
+        <PriorityBadge kind="IT" priority={ticket.itPriority} />
+        {ticket.owner ? <span className="badge badge-owner">Owner: {ticket.owner.displayName}</span> : <span className="badge badge-owner-none">Unassigned</span>}
       </p>
       <p className="small text-muted">Updated <time dateTime={ticket.updatedAt}>{formatTime(ticket.updatedAt)}</time></p>
       {readOnly && <div className="alert alert-info" role="note">Read-only administrator view</div>}
@@ -128,7 +135,7 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
       <div className="row g-3 mb-3">
         <section className="col-12 col-lg-7" aria-label="Ticket information">
           <div className="card zen-card p-3 h-100">
-            <h2 className="h5">Ticket information</h2>
+            <h2 className="h5">Ticket information <span className="field-mode">Read-only</span></h2>
             <dl className="mb-0 readonly-fields">
               <dt>Requester</dt><dd>{ticket.requester.displayName}</dd>
               <dt>Category</dt><dd>{ticket.category.name}</dd>
@@ -144,7 +151,7 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
         {!readOnly && (
           <div className="col-12 col-lg-5 d-grid gap-3">
             <section className="card zen-card p-3" aria-label="Ownership">
-              <h2 className="h5">Ownership</h2>
+              <h2 className="h5">Ownership <span className="field-mode field-mode-editable">Editable</span></h2>
               <p className="mb-2">Current owner: {ticket.owner ? ticket.owner.displayName : "Unassigned"}</p>
               {!ticket.owner && <button className="btn btn-primary mb-2" disabled={saving} onClick={() => void mutate("owner", "claim", "POST", {}, "You now own this Ticket.")}>{busy === "owner" ? "Saving…" : "Claim ticket"}</button>}
               <label htmlFor="owner-select" className="form-label">{ticket.owner ? "Reassign to" : "Assign to"}</label>
@@ -163,8 +170,8 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
             </section>
 
             <section className="card zen-card p-3" aria-label="Priority">
-              <h2 className="h5">Priority</h2>
-              <p className="mb-2">Requested Priority (read-only): {PRIORITY_LABELS[ticket.requestedPriority]}</p>
+              <h2 className="h5">Priority <span className="field-mode field-mode-editable">Editable</span></h2>
+              <p className="mb-2">Requested Priority (read-only): <span className="readonly-inline">{PRIORITY_LABELS[ticket.requestedPriority]}</span></p>
               <label htmlFor="it-priority" className="form-label">IT Priority</label>
               <select id="it-priority" className="form-select" value={priorityChoice} disabled={saving} onChange={(event) => setPriorityChoice(event.target.value as RequestedPriority)}>
                 {Object.entries(PRIORITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -174,8 +181,8 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
             </section>
 
             <section className="card zen-card p-3" aria-label="Status">
-              <h2 className="h5">Status</h2>
-              <p className="mb-2">Current status: {STATUS_LABELS[ticket.currentStatus]}</p>
+              <h2 className="h5">Status <span className="field-mode field-mode-editable">Editable</span></h2>
+              <p className="mb-2">Current status: <StatusBadge status={ticket.currentStatus} /></p>
               {options.length === 0 ? <p className="mb-0">No further status changes.</p> : (
                 <ul className="list-unstyled mb-0">
                   {options.map((option) => {
@@ -184,8 +191,8 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
                     const run = () => void mutate("status", "status", "PATCH", { status: option.to, ...(option.confirm ? { confirmed: true } : {}) }, `Status changed to ${label}.`);
                     return (
                       <li key={option.to} className="mb-2">
-                        <button className="btn btn-outline-primary" disabled={saving || blocked} onClick={() => option.confirm ? setConfirmation({ title: `Confirm status change`, body: `Change status from ${STATUS_LABELS[ticket.currentStatus]} to ${label}?`, run }) : run()}>Move to {label}</button>
-                        {blocked && <span className="ms-2 small text-muted">Assign an owner first</span>}
+                        <button className={`btn ${["CANCELLED", "CLOSED"].includes(option.to) ? "btn-outline-danger" : "btn-outline-primary"}`} disabled={saving || blocked} aria-describedby={blocked ? `blocked-${option.to}` : undefined} onClick={() => option.confirm ? setConfirmation({ title: `Confirm status change`, body: `Change status from ${STATUS_LABELS[ticket.currentStatus]} to ${label}?`, run, danger: ["CANCELLED", "CLOSED"].includes(option.to) }) : run()}>Move to {label}</button>
+                        {blocked && <span id={`blocked-${option.to}`} className="ms-2 small text-muted">Assign an owner first</span>}
                       </li>
                     );
                   })}
@@ -198,19 +205,19 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
       </div>
 
       {confirmation && (
-        <div role="dialog" aria-modal="true" aria-labelledby="confirm-title" className="card zen-card p-3 mb-3">
+        <ModalDialog labelledBy="confirm-title" describedBy="confirm-body" onCancel={() => setConfirmation(null)}>
           <h2 id="confirm-title" className="h5">{confirmation.title}</h2>
-          <p>{confirmation.body}</p>
-          <div className="d-flex gap-2">
-            <button className="btn btn-primary" onClick={confirmation.run}>Confirm</button>
-            <button className="btn btn-outline-secondary" onClick={() => setConfirmation(null)}>Cancel</button>
+          <p id="confirm-body">{confirmation.body}</p>
+          <div className="d-flex flex-wrap gap-2">
+            <button className={`btn ${confirmation.danger ? "btn-danger" : "btn-primary"}`} onClick={confirmation.run}>Confirm</button>
+            <button className="btn btn-outline-secondary" data-autofocus onClick={() => setConfirmation(null)}>Cancel</button>
           </div>
-        </div>
+        </ModalDialog>
       )}
 
-      <div role="tablist" aria-label="Ticket communication" className="d-flex flex-wrap gap-2 mb-2">
-        {([["public", "Public Comments"], ["internal", "Internal Notes"], ["attachments", "Attachments"]] as const).map(([id, label]) => (
-          <button key={id} role="tab" id={`tab-${id}`} aria-selected={tab === id} aria-controls={`panel-${id}`} className={`btn ${tab === id ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab(id)}>{label}</button>
+      <div role="tablist" aria-label="Ticket communication" className="d-flex flex-wrap gap-2 mb-2 comm-tabs">
+        {TABS.map(([id, label]) => (
+          <button key={id} ref={(element) => { tabRefs.current[id] = element; }} role="tab" id={`tab-${id}`} aria-selected={tab === id} aria-controls={tab === id ? `panel-${id}` : undefined} tabIndex={tab === id ? 0 : -1} className={`btn comm-tab comm-tab-${id} ${tab === id ? "is-active" : ""}`} onClick={() => setTab(id)} onKeyDown={onTabKeyDown}>{label}</button>
         ))}
       </div>
 
@@ -222,9 +229,9 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
           {!readOnly && (
             <form onSubmit={(event) => void postEntry("public", event)} noValidate>
               <label htmlFor="public-draft" className="form-label">Add public comment</label>
-              <textarea id="public-draft" className={`form-control${draftErrors.public ? " is-invalid" : ""}`} rows={3} value={drafts.public} disabled={busy === "public"} onChange={(event) => { setDrafts({ ...drafts, public: event.target.value }); setDraftErrors({ ...draftErrors, public: "" }); }} />
-              <div className="form-text">Warning: the requester will see this comment. {Array.from(drafts.public).length}/{MAX_TEXT}</div>
-              {draftErrors.public && <div className="invalid-feedback d-block">{draftErrors.public}</div>}
+              <textarea id="public-draft" className={`form-control${draftErrors.public ? " is-invalid" : ""}`} rows={4} aria-invalid={Boolean(draftErrors.public)} aria-describedby={describedBy("public-draft-help", draftErrors.public && "public-draft-error")} value={drafts.public} disabled={busy === "public"} onChange={(event) => { setDrafts({ ...drafts, public: event.target.value }); setDraftErrors({ ...draftErrors, public: "" }); }} />
+              <div id="public-draft-help" className="form-text">Warning: the requester will see this comment. {Array.from(drafts.public).length}/{MAX_TEXT}</div>
+              {draftErrors.public && <div id="public-draft-error" className="field-error">{draftErrors.public}</div>}
               {postFailure.public && <div className="alert alert-danger mt-2" role="alert">{postFailure.public}</div>}
               {fb("public")}
               <button type="submit" className="btn btn-primary mt-2" disabled={saving}>{busy === "public" ? "Posting…" : "Post public comment"}</button>
@@ -235,18 +242,18 @@ export function StaffTicketDetail({ ticketId, user, onBack }: { ticketId: string
 
       {tab === "internal" && (
         <section id="panel-internal" role="tabpanel" aria-labelledby="tab-internal" className="card p-3 note-surface">
-          <h2 className="h5"><span aria-label="Locked">🔒</span> Internal Notes</h2>
-          <p className="small">Visible only to IT Staff and Administrators. The requester cannot see these notes.</p>
+          <h2 className="h5"><span role="img" aria-label="Locked">🔒</span> Internal Notes</h2>
+          <p className="small note-audience">Visible only to IT Staff and Administrators. The requester cannot see these notes.</p>
           <Entries items={ticket.internalNotes ?? []} empty="No internal notes yet." />
           {!readOnly && (
             <form onSubmit={(event) => void postEntry("internal", event)} noValidate>
               <label htmlFor="internal-draft" className="form-label">Add internal note</label>
-              <textarea id="internal-draft" className={`form-control${draftErrors.internal ? " is-invalid" : ""}`} rows={3} value={drafts.internal} disabled={busy === "internal"} onChange={(event) => { setDrafts({ ...drafts, internal: event.target.value }); setDraftErrors({ ...draftErrors, internal: "" }); }} />
-              <div className="form-text">{Array.from(drafts.internal).length}/{MAX_TEXT}</div>
-              {draftErrors.internal && <div className="invalid-feedback d-block">{draftErrors.internal}</div>}
+              <textarea id="internal-draft" className={`form-control${draftErrors.internal ? " is-invalid" : ""}`} rows={4} aria-invalid={Boolean(draftErrors.internal)} aria-describedby={describedBy("internal-draft-help", draftErrors.internal && "internal-draft-error")} value={drafts.internal} disabled={busy === "internal"} onChange={(event) => { setDrafts({ ...drafts, internal: event.target.value }); setDraftErrors({ ...draftErrors, internal: "" }); }} />
+              <div id="internal-draft-help" className="form-text">Internal Note: never shown to the requester. {Array.from(drafts.internal).length}/{MAX_TEXT}</div>
+              {draftErrors.internal && <div id="internal-draft-error" className="field-error">{draftErrors.internal}</div>}
               {postFailure.internal && <div className="alert alert-danger mt-2" role="alert">{postFailure.internal}</div>}
               {fb("internal")}
-              <button type="submit" className="btn btn-primary mt-2" disabled={saving}>{busy === "internal" ? "Saving…" : "Save internal note"}</button>
+              <button type="submit" className="btn btn-note mt-2" disabled={saving}>{busy === "internal" ? "Saving…" : "Save internal note"}</button>
             </form>
           )}
         </section>
