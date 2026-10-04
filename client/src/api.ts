@@ -337,6 +337,59 @@ export async function createTicket(
   return payload.data;
 }
 
+export type UserRole = "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR";
+
+export interface CurrentUser {
+  id: number;
+  displayName: string;
+  email: string;
+  role: UserRole;
+  isActive: true;
+  mustChangePassword: boolean;
+  sessionExpiresAt: string;
+  csrfToken: string;
+}
+
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  fields?: Record<string, string>;
+  retryAfter?: string | null;
+
+  constructor(status: number, payload: { error?: { code?: string; message?: string; fields?: Record<string, string> } }, retryAfter?: string | null) {
+    super(payload.error?.message ?? "The request could not be completed.");
+    this.status = status;
+    this.code = payload.error?.code;
+    this.fields = payload.error?.fields;
+    this.retryAfter = retryAfter;
+  }
+}
+
+async function authRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    credentials: "include",
+    ...options,
+    headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers },
+  });
+  const payload = response.status === 204 ? {} : await response.json() as { data?: T; error?: { code?: string; message?: string; fields?: Record<string, string> } };
+  if (!response.ok || (response.status !== 204 && !payload.data)) throw new ApiError(response.status, payload, response.headers.get("Retry-After"));
+  return payload.data as T;
+}
+
+export function getCurrentUser(): Promise<CurrentUser> { return authRequest<CurrentUser>("/api/auth/me"); }
+
+export function login(email: string, password: string): Promise<CurrentUser> {
+  return authRequest<CurrentUser>("/api/auth/login", { method: "POST", headers: { Origin: window.location.origin }, body: JSON.stringify({ email, password }) });
+}
+
+export function changePassword(currentPassword: string, newPassword: string, csrfToken: string): Promise<CurrentUser> {
+  return authRequest<CurrentUser>("/api/auth/change-password", { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify({ currentPassword, newPassword }) });
+}
+
+export function logout(csrfToken: string): Promise<void> {
+  return authRequest<void>("/api/auth/logout", { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken } });
+}
+
 function isCategory(value: unknown): value is Category {
   return (
     typeof value === "object" &&

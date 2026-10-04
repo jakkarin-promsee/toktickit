@@ -7,6 +7,16 @@ import path from "node:path";
 import multer from "multer";
 import { getPrisma } from "./prisma.js";
 import {
+  isAllowedOrigin,
+  normalizeEmail,
+  parseCookie,
+  randomSecret,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_SECONDS,
+  sha256,
+} from "./auth.js";
+import { hashPassword, passwordPolicyError, verifyPassword } from "./password.js";
+import {
   findAvailableTicketNumber,
   formatTicketNumber,
 } from "./ticket-number.js";
@@ -26,13 +36,222 @@ import {
 // Supertest can import `app` without opening a port. Do not merge these files.
 export const app = express();
 
-app.use(cors());          // lets the Vite dev server on :5173 call this API
+const clientOrigin = process.env.CLIENT_ORIGIN ?? "http://localhost:5173";
+app.use(cors({ origin: clientOrigin, credentials: true }));
 app.use(express.json());
 
-const attachmentStorage = path.resolve(process.env.ATTACHMENT_STORAGE ?? "storage/attachments");
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { files: 1, fileSize: MAX_ATTACHMENT_BYTES + 1 },
+type AuthSession = {
+  id: string;
+  tokenHash: string;
+  csrfToken: string;
+  expiresAt: Date;
+  user: { id: number; displayName: string; email: string; role: "REQUESTER" | "IT_STAFF" | "ADMINISTRATOR"; isActive: boolean; mustChangePassword: boolean };
+};
+
+const loginAttempts = new Map<string, { failures: number; firstFailureAt: number }>();
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_LIMIT = 5;
+
+function sendAuthError(res: Response, status: number, code: string, message: string, fields?: Record<string, string>) {
+  res.status(status).json({ error: { code, message, ...(fields ? { fields } : {}) } });
+}
+
+function setSessionCookie(res: Response, token: string) {
+  res.cookie(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_MAX_AGE_SECONDS * 1000,
+  });
+}
+
+function clearSessionCookie(res: Response) {
+  res.clearCookie(SESSION_COOKIE, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" });
+}
+
+function safeCurrentUser(session: AuthSession) {
+  return {
+    id: session.user.id,
+    displayName: session.user.displayName,
+    email: session.user.email,
+    role: session.user.role,
+    isActive: true,
+    mustChangePassword: session.user.mustChangePassword,
+    sessionExpiresAt: session.expiresAt,
+    csrfToken: session.csrfToken,
+  };
+}
+
+async function currentSession(req: Request): Promise<AuthSession | null> {
+  const token = parseCookie(req.get("cookie"), SESSION_COOKIE);
+  if (!token || !/^[a-f0-9]{64}$/i.test(token)) return null;
+  const session = await getPrisma().session.findUnique({
+    where: { tokenHash: sha256(token) },
+    include: { user: { select: { id: true, displayName: true, email: true, role: true, isActive: true, mustChangePassword: true } } },
+  });
+  if (!session || session.revokedAt || session.expiresAt <= new Date() || !session.user.isActive) return null;
+  return session;
+}
+
+async function requireSession(req: Request, res: Response, allowPasswordChange = false): Promise<AuthSession | null> {
+  try {
+    const session = await currentSession(req);
+    if (!session) {
+      sendAuthError(res, 401, "AUTHENTICATION_REQUIRED", "Authentication is required.");
+      return null;
+    }
+    if (!allowPasswordChange && session.user.mustChangePassword) {
+      sendAuthError(res, 403, "PASSWORD_CHANGE_REQUIRED", "Change your initial password before continuing.");
+      return null;
+    }
+    return session;
+  } catch (error) {
+    console.error("Authentication lookup failed:", error);
+    sendAuthError(res, 503, "DEPENDENCY_UNAVAILABLE", "Authentication is temporarily unavailable.");
+    return null;
+  }
+}
+
+function csrfValid(req: Request, session: AuthSession): boolean {
+  const supplied = req.get("X-CSRF-Token");
+  return Boolean(supplied && supplied.length === session.csrfToken.length && crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(session.csrfToken)));
+}
+
+function originAndCsrfValid(req: Request, res: Response, session: AuthSession): boolean {
+  if (!isAllowedOrigin(req.get("origin")) || !csrfValid(req, session)) {
+    sendAuthError(res, 403, "CSRF_INVALID", "This request could not be verified.");
+    return false;
+  }
+  return true;
+}
+
+function loginKey(email: string, ip: string): string {
+  return `${email}\u0000${ip}`;
+}
+
+function limiterRetryAfter(key: string): number | null {
+  const entry = loginAttempts.get(key);
+  if (!entry) return null;
+  const elapsed = Date.now() - entry.firstFailureAt;
+  if (elapsed >= LOGIN_WINDOW_MS) {
+    loginAttempts.delete(key);
+    return null;
+  }
+  return entry.failures >= LOGIN_LIMIT ? Math.ceil((LOGIN_WINDOW_MS - elapsed) / 1000) : null;
+}
+
+function recordLoginFailure(key: string) {
+  const now = Date.now();
+  const prior = loginAttempts.get(key);
+  if (!prior || now - prior.firstFailureAt >= LOGIN_WINDOW_MS) loginAttempts.set(key, { failures: 1, firstFailureAt: now });
+  else loginAttempts.set(key, { ...prior, failures: prior.failures + 1 });
+}
+
+async function createSession(userId: number) {
+  const token = randomSecret();
+  const csrfToken = randomSecret();
+  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
+  const session = await getPrisma().session.create({ data: { tokenHash: sha256(token), csrfToken, userId, expiresAt } });
+  return { token, session };
+}
+
+app.post("/api/auth/login", async (req: Request, res: Response) => {
+  if (!isAllowedOrigin(req.get("origin"))) {
+    sendAuthError(res, 403, "CSRF_INVALID", "This request could not be verified.");
+    return;
+  }
+  const { email, password } = req.body ?? {};
+  if (typeof email !== "string" || typeof password !== "string" || email.length > 254 || password.length > 128) {
+    sendAuthError(res, 400, "MALFORMED_REQUEST", "Email and password are required.");
+    return;
+  }
+  const normalizedEmail = normalizeEmail(email);
+  const key = loginKey(normalizedEmail, req.ip ?? "unknown");
+  const retryAfter = limiterRetryAfter(key);
+  if (retryAfter !== null) {
+    res.setHeader("Retry-After", String(retryAfter));
+    sendAuthError(res, 429, "TOO_MANY_ATTEMPTS", "Too many sign-in attempts. Try again later.");
+    return;
+  }
+  try {
+    const user = await getPrisma().user.findUnique({ where: { email: normalizedEmail }, include: { credential: true } });
+    const passwordMatches = Boolean(user?.credential && await verifyPassword(user.credential.passwordHash, password));
+    if (!user || !user.isActive || !passwordMatches) {
+      recordLoginFailure(key);
+      sendAuthError(res, 401, "AUTHENTICATION_FAILED", "Sign-in failed. Check your credentials or account status.");
+      return;
+    }
+    loginAttempts.delete(key);
+    const { token, session } = await createSession(user.id);
+    setSessionCookie(res, token);
+    res.status(200).json({ data: { id: user.id, displayName: user.displayName, email: user.email, role: user.role, isActive: true, mustChangePassword: user.mustChangePassword, sessionExpiresAt: session.expiresAt, csrfToken: session.csrfToken } });
+  } catch (error) {
+    console.error("POST /api/auth/login failed:", error);
+    sendAuthError(res, 503, "DEPENDENCY_UNAVAILABLE", "We could not sign you in right now. Try again.");
+  }
+});
+
+app.get("/api/auth/me", async (req: Request, res: Response) => {
+  const session = await requireSession(req, res, true);
+  if (session) res.status(200).json({ data: safeCurrentUser(session) });
+});
+
+app.post("/api/auth/change-password", async (req: Request, res: Response) => {
+  const session = await requireSession(req, res, true);
+  if (!session || !originAndCsrfValid(req, res, session)) return;
+  const { currentPassword, newPassword } = req.body ?? {};
+  if (typeof currentPassword !== "string" || typeof newPassword !== "string" || currentPassword.length > 128 || newPassword.length > 128) {
+    sendAuthError(res, 400, "MALFORMED_REQUEST", "Password values are required.");
+    return;
+  }
+  const fields: Record<string, string> = {};
+  const passwordError = passwordPolicyError(newPassword);
+  if (passwordError) fields.newPassword = passwordError;
+  try {
+    const credential = await getPrisma().credential.findUnique({ where: { userId: session.user.id } });
+    if (!credential || !await verifyPassword(credential.passwordHash, currentPassword)) fields.currentPassword = "Current password is incorrect.";
+    else if (currentPassword === newPassword) fields.newPassword = "New password must differ from current password.";
+    if (Object.keys(fields).length > 0) {
+      sendAuthError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", fields);
+      return;
+    }
+    const passwordHash = await hashPassword(newPassword);
+    const token = randomSecret();
+    const csrfToken = randomSecret();
+    const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
+    await getPrisma().$transaction(async (tx) => {
+      await tx.credential.update({ where: { userId: session.user.id }, data: { passwordHash, passwordChangedAt: new Date() } });
+      await tx.user.update({ where: { id: session.user.id }, data: { mustChangePassword: false } });
+      await tx.session.updateMany({ where: { userId: session.user.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await tx.session.create({ data: { tokenHash: sha256(token), csrfToken, userId: session.user.id, expiresAt } });
+    });
+    setSessionCookie(res, token);
+    res.status(200).json({ data: { ...safeCurrentUser(session), mustChangePassword: false, sessionExpiresAt: expiresAt, csrfToken } });
+  } catch (error) {
+    console.error("POST /api/auth/change-password failed:", error);
+    sendAuthError(res, 503, "DEPENDENCY_UNAVAILABLE", "We could not change your password right now. Try again.");
+  }
+});
+
+app.post("/api/auth/logout", async (req: Request, res: Response) => {
+  try {
+    const session = await currentSession(req);
+    if (session) {
+      if (!originAndCsrfValid(req, res, session)) return;
+      await getPrisma().session.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
+    }
+    clearSessionCookie(res);
+    res.status(204).send();
+  } catch (error) {
+    console.error("POST /api/auth/logout failed:", error);
+    sendAuthError(res, 503, "DEPENDENCY_UNAVAILABLE", "We could not sign you out. Try again.");
+  }
+});
+
+app.get("/api/app", async (req: Request, res: Response) => {
+  const session = await requireSession(req, res);
+  if (session) res.status(200).json({ data: { role: session.user.role } });
 });
 
 app.get("/api/requesters", async (_req: Request, res: Response) => {
@@ -42,27 +261,19 @@ app.get("/api/requesters", async (_req: Request, res: Response) => {
       orderBy: [{ displayName: "asc" }, { id: "asc" }],
       select: { id: true, displayName: true, email: true },
     });
-
     res.status(200).json({ data: requesters });
   } catch (error) {
     console.error("GET /api/requesters failed:", error);
-    res.status(503).json({
-      error: {
-        code: "DEPENDENCY_UNAVAILABLE",
-        message: "Development Requesters are temporarily unavailable.",
-      },
-    });
+    res.status(503).json({ error: { code: "DEPENDENCY_UNAVAILABLE", message: "Development Requesters are temporarily unavailable." } });
   }
 });
 
-// ---------------------------------------------------------------------------
-// Issue 2 — API health check
-// Liveness probe: answers "is this process up and serving HTTP?".
-// It deliberately does NOT touch the database — a readiness check would, and
-// coupling the two would make the API report itself dead whenever Postgres is
-// merely slow. Keeping it DB-free is also what lets the Supertest suite run
-// without a running database.
-// ---------------------------------------------------------------------------
+const attachmentStorage = path.resolve(process.env.ATTACHMENT_STORAGE ?? "storage/attachments");
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { files: 1, fileSize: MAX_ATTACHMENT_BYTES + 1 },
+});
+
 app.get("/api/health", (_req: Request, res: Response) => {
   res.status(200).json({ status: "ok", service: "TokTickIT API" });
 });
@@ -190,19 +401,13 @@ async function getActiveRequester(req: Request, res: Response) {
     );
     return null;
   }
-
   try {
     const requester = await getPrisma().user.findFirst({
       where: { id: Number(rawId), role: "REQUESTER", isActive: true },
       select: { id: true, displayName: true, email: true },
     });
     if (!requester) {
-      sendError(
-        res,
-        400,
-        "INVALID_REQUESTER_CONTEXT",
-        "A valid Development Requester context is required.",
-      );
+      sendError(res, 400, "INVALID_REQUESTER_CONTEXT", "A valid Development Requester context is required.");
       return null;
     }
     return requester;
