@@ -157,3 +157,16 @@ body {
 .requester-detail dd {
   overflow-wrap: anywhere;
 }
+
+.queue-summary {
+  overflow-wrap: anywhere;
+}
+
+.queue-table {
+  overflow-wrap: anywhere;
+}
+
+.queue-table th .btn-link {
+  font-weight: inherit;
+  text-decoration: none;
+}
