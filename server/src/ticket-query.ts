@@ -22,7 +22,7 @@ export interface TicketQuery {
   pageSize: (typeof TICKET_PAGE_SIZES)[number];
 }
 
-function singleValue(input: unknown, key: string): string | undefined {
+export function singleValue(input: unknown, key: string): string | undefined {
   if (input === undefined) return undefined;
   if (Array.isArray(input) || typeof input !== "string") {
     throw new Error(`Invalid ${key}.`);
@@ -30,7 +30,7 @@ function singleValue(input: unknown, key: string): string | undefined {
   return input;
 }
 
-function positiveInteger(value: string | undefined, key: string): number | undefined {
+export function positiveInteger(value: string | undefined, key: string): number | undefined {
   if (value === undefined) return undefined;
   if (!/^[1-9]\d*$/.test(value)) throw new Error(`Invalid ${key}.`);
   const parsed = Number(value);
