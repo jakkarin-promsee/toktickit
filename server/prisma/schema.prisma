@@ -1,6 +1,5 @@
 // Prisma schema for the TokTickIT database.
-// DATABASE_URL is read from server/.env, which is git-ignored; server/.env.example
-// carries the shape of it.
+// DATABASE_URL is read from server/.env, which is git-ignored; server/.env.example carries the shape of it.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,6 +10,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  REQUESTER
+  IT_STAFF
+  ADMINISTRATOR
+}
+
 enum RequestedPriority {
   LOW
   MEDIUM
@@ -18,7 +23,6 @@ enum RequestedPriority {
 }
 
 enum ItPriority {
-  UNASSIGNED
   LOW
   MEDIUM
   HIGH
@@ -26,20 +30,63 @@ enum ItPriority {
 
 enum TicketStatus {
   NEW
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_REQUESTER
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
 }
 
-model RequesterUser {
-  id                  Int          @id @default(autoincrement())
-  email               String       @unique
-  displayName         String
-  isActive            Boolean      @default(true)
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @default(now()) @updatedAt
-  tickets             Ticket[]
-  uploadedAttachments Attachment[] @relation("AttachmentUploader")
-  removedAttachments  Attachment[] @relation("AttachmentRemover")
+model User {
+  id                         Int             @id @default(autoincrement())
+  email                      String          @unique @db.VarChar(254)
+  displayName                String          @db.VarChar(100)
+  role                       UserRole
+  isActive                   Boolean         @default(true)
+  mustChangePassword         Boolean         @default(true)
+  version                    Int             @default(0)
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @default(now()) @updatedAt
+  credential                 Credential?
+  sessions                   Session[]
+  submittedTickets           Ticket[]        @relation("TicketSubmitter")
+  ownedTickets               Ticket[]        @relation("TicketOwner")
+  requesterResolutionTickets Ticket[]        @relation("RequesterResolutionActor")
+  statusChangedTickets       Ticket[]        @relation("TicketStatusActor")
+  ownerChangedTickets        Ticket[]        @relation("TicketOwnerActor")
+  priorityChangedTickets     Ticket[]        @relation("TicketPriorityActor")
+  uploadedAttachments        Attachment[]    @relation("AttachmentUploader")
+  removedAttachments         Attachment[]    @relation("AttachmentRemover")
+  publicComments             PublicComment[] @relation("PublicCommentAuthor")
+  internalNotes              InternalNote[]  @relation("InternalNoteAuthor")
 
   @@index([isActive, displayName, id])
+  @@index([role, isActive, displayName, id])
+}
+
+model Credential {
+  userId            Int      @id
+  passwordHash      String   @db.VarChar(255)
+  createdAt         DateTime @default(now())
+  passwordChangedAt DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  csrfToken  String    @db.Char(64)
+  userId     Int
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastSeenAt DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([expiresAt])
 }
 
 model Category {
@@ -65,50 +112,105 @@ model RelatedSystem {
 }
 
 model Ticket {
-  id                String            @id @default(uuid()) @db.Uuid
-  ticketNumber      String            @unique @db.VarChar(19)
-  requesterId       Int
-  categoryId        Int
-  relatedSystemId   Int
-  summary           String            @db.VarChar(120)
-  description       String            @db.VarChar(2000)
-  requestedPriority RequestedPriority
-  itPriority        ItPriority        @default(UNASSIGNED)
-  currentStatus     TicketStatus      @default(NEW)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @default(now()) @updatedAt
-  requester         RequesterUser     @relation(fields: [requesterId], references: [id], onDelete: Restrict)
-  category          Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  relatedSystem     RelatedSystem     @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
-  attachments       Attachment[]
+  id                          String            @id @default(uuid()) @db.Uuid
+  ticketNumber                String            @unique @db.VarChar(19)
+  submittedByUserId           Int
+  categoryId                  Int
+  relatedSystemId             Int
+  ownerId                     Int?
+  summary                     String            @db.VarChar(120)
+  description                 String            @db.VarChar(2000)
+  requestedPriority           RequestedPriority
+  itPriority                  ItPriority
+  currentStatus               TicketStatus      @default(NEW)
+  requesterResolvedAt         DateTime?
+  requesterResolvedByUserId   Int?
+  lastStatusChangedAt         DateTime?
+  lastStatusChangedByUserId   Int?
+  lastOwnerChangedAt          DateTime?
+  lastOwnerChangedByUserId    Int?
+  lastPriorityChangedAt       DateTime?
+  lastPriorityChangedByUserId Int?
+  version                     Int               @default(0)
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @default(now()) @updatedAt
+  submittedBy                 User              @relation("TicketSubmitter", fields: [submittedByUserId], references: [id], onDelete: Restrict)
+  owner                       User?             @relation("TicketOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  requesterResolvedBy         User?             @relation("RequesterResolutionActor", fields: [requesterResolvedByUserId], references: [id], onDelete: Restrict)
+  lastStatusChangedBy         User?             @relation("TicketStatusActor", fields: [lastStatusChangedByUserId], references: [id], onDelete: Restrict)
+  lastOwnerChangedBy          User?             @relation("TicketOwnerActor", fields: [lastOwnerChangedByUserId], references: [id], onDelete: Restrict)
+  lastPriorityChangedBy       User?             @relation("TicketPriorityActor", fields: [lastPriorityChangedByUserId], references: [id], onDelete: Restrict)
+  category                    Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystem               RelatedSystem     @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+  attachments                 Attachment[]
+  publicComments              PublicComment[]
+  internalNotes               InternalNote[]
 
-  @@index([requesterId, updatedAt, id])
-  @@index([requesterId, createdAt, id])
-  @@index([requesterId, categoryId])
-  @@index([requesterId, relatedSystemId])
-  @@index([requesterId, currentStatus])
-  @@index([requesterId, requestedPriority])
-  @@index([requesterId, ticketNumber])
+  @@index([submittedByUserId, updatedAt, id])
+  @@index([submittedByUserId, createdAt, id])
+  @@index([submittedByUserId, categoryId])
+  @@index([submittedByUserId, relatedSystemId])
+  @@index([submittedByUserId, currentStatus])
+  @@index([submittedByUserId, requestedPriority])
+  @@index([submittedByUserId, ticketNumber])
+  @@index([updatedAt, id])
+  @@index([createdAt, id])
+  @@index([ownerId, updatedAt, id])
+  @@index([currentStatus, updatedAt, id])
+  @@index([itPriority, updatedAt, id])
+  @@index([requestedPriority, updatedAt, id])
+  @@index([categoryId, updatedAt, id])
+  @@index([relatedSystemId, updatedAt, id])
+  @@index([requesterResolvedByUserId])
+  @@index([lastStatusChangedByUserId])
+  @@index([lastOwnerChangedByUserId])
+  @@index([lastPriorityChangedByUserId])
 }
 
 model Attachment {
-  id                    String         @id @default(uuid()) @db.Uuid
-  ticketId              String         @db.Uuid
-  originalName          String         @db.VarChar(255)
-  storageName           String         @unique @db.VarChar(255)
-  mimeType              String         @db.VarChar(100)
-  sizeBytes             Int
-  sha256                String         @db.Char(64)
-  uploadedByRequesterId Int
-  createdAt             DateTime       @default(now())
-  removedAt             DateTime?
-  removedByRequesterId  Int?
-  removalReason         String?        @db.VarChar(250)
-  ticket                Ticket         @relation(fields: [ticketId], references: [id], onDelete: Restrict)
-  uploadedBy            RequesterUser  @relation("AttachmentUploader", fields: [uploadedByRequesterId], references: [id], onDelete: Restrict)
-  removedBy             RequesterUser? @relation("AttachmentRemover", fields: [removedByRequesterId], references: [id], onDelete: Restrict)
+  id               String    @id @default(uuid()) @db.Uuid
+  ticketId         String    @db.Uuid
+  originalName     String    @db.VarChar(255)
+  storageName      String    @unique @db.VarChar(255)
+  mimeType         String    @db.VarChar(100)
+  sizeBytes        Int
+  sha256           String    @db.Char(64)
+  uploadedByUserId Int
+  createdAt        DateTime  @default(now())
+  removedAt        DateTime?
+  removedByUserId  Int?
+  removalReason    String?   @db.VarChar(250)
+  ticket           Ticket    @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  uploadedBy       User      @relation("AttachmentUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  removedBy        User?     @relation("AttachmentRemover", fields: [removedByUserId], references: [id], onDelete: Restrict)
 
   @@index([ticketId, removedAt])
-  @@index([uploadedByRequesterId])
-  @@index([removedByRequesterId])
+  @@index([uploadedByUserId])
+  @@index([removedByUserId])
+}
+
+model PublicComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @db.Uuid
+  authorId  Int
+  content   String   @db.VarChar(2000)
+  createdAt DateTime @default(now())
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  author    User     @relation("PublicCommentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt, id])
+  @@index([authorId])
+}
+
+model InternalNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @db.Uuid
+  authorId  Int
+  content   String   @db.VarChar(2000)
+  createdAt DateTime @default(now())
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  author    User     @relation("InternalNoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt, id])
+  @@index([authorId])
 }
