@@ -12,6 +12,8 @@ export interface RelatedSystem {
 
 export type RequestedPriority = "LOW" | "MEDIUM" | "HIGH";
 
+export type TicketStatus = "NEW" | "OPEN" | "IN_PROGRESS" | "WAITING_FOR_REQUESTER" | "RESOLVED" | "CLOSED" | "REOPENED" | "CANCELLED";
+
 export interface CreatedTicket {
   id: string;
   ticketNumber: string;
@@ -22,7 +24,7 @@ export interface CreatedTicket {
   summary: string;
   requestedPriority: RequestedPriority;
   itPriority: "LOW" | "MEDIUM" | "HIGH";
-  currentStatus: "NEW";
+  currentStatus: TicketStatus;
   description: string;
   createdAt: string;
   updatedAt: string;
@@ -36,7 +38,7 @@ export interface TicketListItem {
   relatedSystem: RelatedSystem;
   requestedPriority: RequestedPriority;
   itPriority: "UNASSIGNED" | "LOW" | "MEDIUM" | "HIGH";
-  currentStatus: "NEW";
+  currentStatus: TicketStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +58,15 @@ export interface TicketAttachmentMetadata {
 
 export interface TicketDetail extends CreatedTicket {
   attachments: TicketAttachmentMetadata[];
+  requesterResolvedAt: string | null;
+  version: number;
+}
+
+export interface PublicComment {
+  id: string;
+  content: string;
+  author: { id: number; displayName: string };
+  createdAt: string;
 }
 
 export async function uploadAttachment(
@@ -371,4 +382,20 @@ function isCategory(value: unknown): value is Category {
     typeof (value as Category).id === "number" &&
     typeof (value as Category).name === "string"
   );
+}
+
+export function getTicketComments(ticketId: string): Promise<PublicComment[]> {
+  return authRequest<PublicComment[]>(`/api/tickets/${ticketId}/comments`);
+}
+
+export function postTicketComment(ticketId: string, content: string, csrfToken: string): Promise<PublicComment> {
+  return authRequest<PublicComment>(`/api/tickets/${ticketId}/comments`, { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify({ content }) });
+}
+
+export function markProblemAppearsResolved(ticketId: string, version: number, csrfToken: string): Promise<TicketDetail> {
+  return authRequest<TicketDetail>(`/api/tickets/${ticketId}/problem-appears-resolved`, { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify({ version }) });
+}
+
+export function fetchTicketDetail(ticketId: string): Promise<TicketDetail> {
+  return authRequest<TicketDetail>(`/api/tickets/${ticketId}`);
 }

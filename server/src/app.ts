@@ -760,6 +760,60 @@ app.delete("/api/attachments/:attachmentId", async (req: Request, res: Response)
   }
 });
 
+const ticketDetailInclude = {
+  submittedBy: { select: { id: true, displayName: true } },
+  category: { select: { id: true, name: true } },
+  relatedSystem: { select: { id: true, name: true } },
+  attachments: { include: attachmentIncludes },
+} as const;
+
+function sortAttachments<T extends { createdAt: Date; removedAt: Date | null }>(attachments: T[]): T[] {
+  return [...attachments].sort((left, right) => {
+    if (left.removedAt === null && right.removedAt !== null) return -1;
+    if (left.removedAt !== null && right.removedAt === null) return 1;
+    if (left.removedAt === null && right.removedAt === null) {
+      return left.createdAt.getTime() - right.createdAt.getTime();
+    }
+    return right.removedAt!.getTime() - left.removedAt!.getTime();
+  });
+}
+
+async function requesterTicketDetail(ticketId: string, requesterId: number) {
+  const ticket = await getPrisma().ticket.findFirst({
+    where: { id: ticketId, submittedByUserId: requesterId },
+    include: ticketDetailInclude,
+  });
+  if (!ticket) return null;
+  return {
+    id: ticket.id,
+    ticketNumber: ticket.ticketNumber,
+    ticketDate: ticket.createdAt,
+    requester: ticket.submittedBy,
+    category: ticket.category,
+    relatedSystem: ticket.relatedSystem,
+    summary: ticket.summary,
+    requestedPriority: ticket.requestedPriority,
+    itPriority: ticket.itPriority,
+    currentStatus: ticket.currentStatus,
+    description: ticket.description,
+    requesterResolvedAt: ticket.requesterResolvedAt,
+    version: ticket.version,
+    createdAt: ticket.createdAt,
+    updatedAt: ticket.updatedAt,
+    attachments: sortAttachments(ticket.attachments).map(attachmentMetadata),
+  };
+}
+
+function ticketFailure(res: Response, error: unknown, label: string, message: string) {
+  console.error(`${label} failed:`, error);
+  sendError(
+    res,
+    isDependencyError(error) ? 503 : 500,
+    isDependencyError(error) ? "DEPENDENCY_UNAVAILABLE" : "INTERNAL_ERROR",
+    isDependencyError(error) ? "Tickets are temporarily unavailable." : message,
+  );
+}
+
 app.get("/api/tickets/:ticketId", async (req: Request, res: Response) => {
   const session = await requireRequester(req, res);
   if (!session) return;
@@ -771,79 +825,146 @@ app.get("/api/tickets/:ticketId", async (req: Request, res: Response) => {
   }
 
   try {
-    const ticket = await getPrisma().ticket.findFirst({
-      where: {
-        id: ticketId,
-        submittedByUserId: session.user.id,
-      },
-      include: {
-        submittedBy: { select: { id: true, displayName: true } },
-        category: { select: { id: true, name: true } },
-        relatedSystem: { select: { id: true, name: true } },
-        attachments: {
-          include: {
-            uploadedBy: { select: { displayName: true } },
-            removedBy: { select: { displayName: true } },
-          },
-        },
-      },
-    });
+    const detail = await requesterTicketDetail(ticketId, session.user.id);
+    if (!detail) {
+      sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+      return;
+    }
+    res.status(200).json({ data: detail });
+  } catch (error) {
+    ticketFailure(res, error, "GET /api/tickets/:ticketId", "Ticket could not be loaded. Please try again.");
+  }
+});
 
+// ---------------------------------------------------------------------------
+// Public Comments and Problem Appears Resolved (Issue #34)
+// ---------------------------------------------------------------------------
+const MAX_COMMENT_LENGTH = 2000;
+const commentInclude = { author: { select: { id: true, displayName: true } } } as const;
+
+function publicCommentView(comment: { id: string; content: string; createdAt: Date; author: { id: number; displayName: string } }) {
+  return { id: comment.id, content: comment.content, author: comment.author, createdAt: comment.createdAt };
+}
+
+function onlyKeys(body: unknown, allowed: string): body is Record<string, unknown> {
+  return typeof body === "object" && body !== null && !Array.isArray(body) && Object.keys(body).every((key) => key === allowed);
+}
+
+app.get("/api/tickets/:ticketId/comments", async (req: Request, res: Response) => {
+  const session = await requireSession(req, res);
+  if (!session) return;
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) {
+    sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+    return;
+  }
+  try {
+    const ticket = await readableTicket(ticketId, session);
     if (!ticket) {
       sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
       return;
     }
-
-    const attachments = [...ticket.attachments]
-      .sort((left, right) => {
-        if (left.removedAt === null && right.removedAt !== null) return -1;
-        if (left.removedAt !== null && right.removedAt === null) return 1;
-        if (left.removedAt === null && right.removedAt === null) {
-          return left.createdAt.getTime() - right.createdAt.getTime();
-        }
-        return right.removedAt!.getTime() - left.removedAt!.getTime();
-      })
-      .map((attachment) => ({
-        id: attachment.id,
-        originalName: attachment.originalName,
-        mimeType: attachment.mimeType,
-        sizeBytes: attachment.sizeBytes,
-        state: attachment.removedAt ? "REMOVED" : "ACTIVE",
-        uploadedByDisplayName: attachment.uploadedBy.displayName,
-        createdAt: attachment.createdAt,
-        removedAt: attachment.removedAt,
-        removedByDisplayName: attachment.removedBy?.displayName ?? null,
-        removalReason: attachment.removalReason,
-      }));
-
-    res.status(200).json({
-      data: {
-        id: ticket.id,
-        ticketNumber: ticket.ticketNumber,
-        ticketDate: ticket.createdAt,
-        requester: ticket.submittedBy,
-        category: ticket.category,
-        relatedSystem: ticket.relatedSystem,
-        summary: ticket.summary,
-        requestedPriority: ticket.requestedPriority,
-        itPriority: ticket.itPriority,
-        currentStatus: ticket.currentStatus,
-        description: ticket.description,
-        createdAt: ticket.createdAt,
-        updatedAt: ticket.updatedAt,
-        attachments,
-      },
+    const comments = await getPrisma().publicComment.findMany({
+      where: { ticketId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      include: commentInclude,
     });
+    res.status(200).json({ data: comments.map(publicCommentView) });
   } catch (error) {
-    console.error("GET /api/tickets/:ticketId failed:", error);
-    sendError(
-      res,
-      isDependencyError(error) ? 503 : 500,
-      isDependencyError(error) ? "DEPENDENCY_UNAVAILABLE" : "INTERNAL_ERROR",
-      isDependencyError(error)
-        ? "Tickets are temporarily unavailable."
-        : "Ticket could not be loaded. Please try again.",
-    );
+    ticketFailure(res, error, "GET comments", "Comments could not be loaded.");
+  }
+});
+
+app.post("/api/tickets/:ticketId/comments", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["REQUESTER", "IT_STAFF"]);
+  if (!session || !originAndCsrfValid(req, res, session)) return;
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) {
+    sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+    return;
+  }
+  const body = req.body;
+  if (!onlyKeys(body, "content")) {
+    sendError(res, 400, "MALFORMED_REQUEST", "Only content may be supplied.");
+    return;
+  }
+  try {
+    const ticket = await readableTicket(ticketId, session);
+    if (!ticket) {
+      sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+      return;
+    }
+    const content = typeof body.content === "string" ? body.content.trim() : "";
+    const length = Array.from(content).length;
+    if (length === 0) {
+      sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", { content: "Comment is required." });
+      return;
+    }
+    if (length > MAX_COMMENT_LENGTH) {
+      sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", { content: `Comment must contain ${MAX_COMMENT_LENGTH} characters or fewer.` });
+      return;
+    }
+    const comment = await getPrisma().publicComment.create({
+      data: { ticketId, authorId: session.user.id, content },
+      include: commentInclude,
+    });
+    res.status(201).json({ data: publicCommentView(comment) });
+  } catch (error) {
+    ticketFailure(res, error, "POST comment", "Comment could not be posted. Please try again.");
+  }
+});
+
+app.post("/api/tickets/:ticketId/problem-appears-resolved", async (req: Request, res: Response) => {
+  const session = await requireRequester(req, res, true);
+  if (!session) return;
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) {
+    sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+    return;
+  }
+  const body = req.body;
+  if (!onlyKeys(body, "version")) {
+    sendError(res, 400, "MALFORMED_REQUEST", "Only version may be supplied.");
+    return;
+  }
+  const version = body.version;
+  try {
+    const prisma = getPrisma();
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: ticketId, submittedByUserId: session.user.id },
+      select: { currentStatus: true, requesterResolvedAt: true, version: true },
+    });
+    if (!ticket) {
+      sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+      return;
+    }
+    if (typeof version !== "number" || !Number.isInteger(version) || version < 0) {
+      sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", { version: "Version must be a non-negative integer." });
+      return;
+    }
+    if (ticket.currentStatus !== "WAITING_FOR_REQUESTER") {
+      sendError(res, 409, "INVALID_TICKET_STATE", "This Ticket is not waiting for your response.");
+      return;
+    }
+    if (ticket.requesterResolvedAt) {
+      sendError(res, 409, "RESOLUTION_ALREADY_INDICATED", "You have already indicated that the problem appears resolved.");
+      return;
+    }
+    if (ticket.version !== version) {
+      sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh and try again.");
+      return;
+    }
+    const updated = await prisma.ticket.updateMany({
+      where: { id: ticketId, version, currentStatus: "WAITING_FOR_REQUESTER", requesterResolvedAt: null },
+      data: { requesterResolvedAt: new Date(), requesterResolvedByUserId: session.user.id, version: { increment: 1 } },
+    });
+    if (updated.count === 0) {
+      sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh and try again.");
+      return;
+    }
+    res.status(200).json({ data: await requesterTicketDetail(ticketId, session.user.id) });
+  } catch (error) {
+    ticketFailure(res, error, "POST problem-appears-resolved", "The request could not be recorded. Please try again.");
   }
 });
 
