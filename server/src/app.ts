@@ -25,7 +25,8 @@ import {
   validateCreateTicketInput,
 } from "./ticket-validation.js";
 import { parseTicketQuery } from "./ticket-query.js";
-import { parseStaffQuery, StaffQuery } from "./staff-query.js";
+import { parseStaffQuery, StaffQuery, TICKET_STATUSES, TicketStatusValue } from "./staff-query.js";
+import { transitionRule } from "./status-transitions.js";
 import {
   MAX_ACTIVE_ATTACHMENTS,
   MAX_ATTACHMENT_BYTES,
@@ -1137,15 +1138,277 @@ app.get("/api/staff/tickets", async (req: Request, res: Response) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// IT Staff Ticket Detail and operations (Issue #36).
+// ---------------------------------------------------------------------------
+const personSelect = { select: { id: true, displayName: true, role: true } } as const;
+
+const staffDetailInclude = {
+  submittedBy: personSelect,
+  owner: personSelect,
+  requesterResolvedBy: personSelect,
+  lastStatusChangedBy: personSelect,
+  lastOwnerChangedBy: personSelect,
+  lastPriorityChangedBy: personSelect,
+  category: { select: { id: true, name: true } },
+  relatedSystem: { select: { id: true, name: true } },
+  attachments: { include: attachmentIncludes },
+} as const;
+
+async function staffTicketDetail(ticketId: string) {
+  const ticket = await getPrisma().ticket.findUnique({ where: { id: ticketId }, include: staffDetailInclude });
+  if (!ticket) return null;
+  return {
+    id: ticket.id,
+    ticketNumber: ticket.ticketNumber,
+    ticketDate: ticket.createdAt,
+    summary: ticket.summary,
+    description: ticket.description,
+    requester: ticket.submittedBy,
+    category: ticket.category,
+    relatedSystem: ticket.relatedSystem,
+    requestedPriority: ticket.requestedPriority,
+    itPriority: ticket.itPriority,
+    currentStatus: ticket.currentStatus,
+    owner: ticket.owner,
+    requesterResolvedAt: ticket.requesterResolvedAt,
+    requesterResolvedBy: ticket.requesterResolvedBy,
+    lastStatusChangedAt: ticket.lastStatusChangedAt,
+    lastStatusChangedBy: ticket.lastStatusChangedBy,
+    lastOwnerChangedAt: ticket.lastOwnerChangedAt,
+    lastOwnerChangedBy: ticket.lastOwnerChangedBy,
+    lastPriorityChangedAt: ticket.lastPriorityChangedAt,
+    lastPriorityChangedBy: ticket.lastPriorityChangedBy,
+    createdAt: ticket.createdAt,
+    updatedAt: ticket.updatedAt,
+    version: ticket.version,
+    attachments: sortAttachments(ticket.attachments).map(attachmentMetadata),
+  };
+}
+
+app.get("/api/staff/assignees", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF"]);
+  if (!session) return;
+  try {
+    const users = await getPrisma().user.findMany({
+      where: { isActive: true, role: { in: ["IT_STAFF", "ADMINISTRATOR"] } },
+      orderBy: [{ displayName: "asc" }, { id: "asc" }],
+      select: { id: true, displayName: true, role: true },
+    });
+    res.status(200).json({ data: users });
+  } catch (error) {
+    ticketFailure(res, error, "GET /api/staff/assignees", "Assignees could not be loaded.");
+  }
+});
+
+app.get("/api/staff/tickets/:ticketId", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF", "ADMINISTRATOR"]);
+  if (!session) return;
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) {
+    sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+    return;
+  }
+  try {
+    const detail = await staffTicketDetail(ticketId);
+    if (!detail) {
+      sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+      return;
+    }
+    const prisma = getPrisma();
+    const [publicComments, internalNotes] = await Promise.all([
+      prisma.publicComment.findMany({ where: { ticketId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], include: commentInclude }),
+      prisma.internalNote.findMany({ where: { ticketId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], include: commentInclude }),
+    ]);
+    res.status(200).json({ data: { ...detail, publicComments: publicComments.map(publicCommentView), internalNotes: internalNotes.map(publicCommentView) } });
+  } catch (error) {
+    ticketFailure(res, error, "GET /api/staff/tickets/:ticketId", "Ticket could not be loaded. Please try again.");
+  }
+});
+
+type MutationPlan = { data: Prisma.TicketUncheckedUpdateManyInput; where?: Prisma.TicketWhereInput } | { stop: true };
+type TicketForMutation = {
+  currentStatus: TicketStatusValue;
+  ownerId: number | null;
+  version: number;
+  owner: { isActive: boolean; role: string } | null;
+};
+
+// Shared flow for owner, priority, and status mutations: IT Staff only, Origin and CSRF checked, exact
+// body keys, optimistic version check, and one conditional write so a concurrent writer loses with 409.
+async function mutateTicket(
+  req: Request,
+  res: Response,
+  allowedKeys: string[],
+  plan: (body: Record<string, unknown>, ticket: TicketForMutation, actorId: number) => Promise<MutationPlan> | MutationPlan,
+  extraWhere: (ticket: TicketForMutation) => Prisma.TicketWhereInput = () => ({}),
+) {
+  const session = await requireRole(req, res, ["IT_STAFF"]);
+  if (!session || !originAndCsrfValid(req, res, session)) return;
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) {
+    sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+    return;
+  }
+  const body = req.body;
+  if (typeof body !== "object" || body === null || Array.isArray(body) || Object.keys(body).some((key) => !allowedKeys.includes(key))) {
+    sendError(res, 400, "MALFORMED_REQUEST", "The request body is not valid.");
+    return;
+  }
+  try {
+    const prisma = getPrisma();
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { currentStatus: true, ownerId: true, version: true, owner: { select: { isActive: true, role: true } } },
+    });
+    if (!ticket) {
+      sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+      return;
+    }
+    const version = body.version;
+    if (typeof version !== "number" || !Number.isInteger(version) || version < 0) {
+      sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", { version: "Version must be a non-negative integer." });
+      return;
+    }
+    const result = await plan(body, ticket as TicketForMutation, session.user.id);
+    if ("stop" in result) return;
+    if (ticket.version !== version) {
+      sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh before trying again.");
+      return;
+    }
+    const updated = await prisma.ticket.updateMany({
+      where: { id: ticketId, version, ...extraWhere(ticket as TicketForMutation), ...(result.where ?? {}) },
+      data: { ...result.data, version: { increment: 1 } },
+    });
+    if (updated.count === 0) {
+      sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh before trying again.");
+      return;
+    }
+    const detail = await staffTicketDetail(ticketId);
+    res.status(200).json({ data: detail });
+  } catch (error) {
+    ticketFailure(res, error, `${req.method} ${req.path}`, "The change could not be saved. Please try again.");
+  }
+}
+
+function validation(res: Response, fields: Record<string, string>): { stop: true } {
+  sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", fields);
+  return { stop: true };
+}
+
+app.post("/api/staff/tickets/:ticketId/claim", (req: Request, res: Response) =>
+  mutateTicket(req, res, ["version"], (_body, ticket, actorId) => {
+    if (ticket.ownerId !== null) {
+      sendError(res, 409, "TICKET_ALREADY_ASSIGNED", "This Ticket already has an owner.");
+      return { stop: true };
+    }
+    return { data: { ownerId: actorId, lastOwnerChangedAt: new Date(), lastOwnerChangedByUserId: actorId }, where: { ownerId: null } };
+  }),
+);
+
+app.patch("/api/staff/tickets/:ticketId/owner", (req: Request, res: Response) =>
+  mutateTicket(req, res, ["ownerId", "version", "confirmed"], async (body, ticket, actorId) => {
+    const ownerId = body.ownerId;
+    if (typeof ownerId !== "number" || !Number.isInteger(ownerId) || ownerId < 1) return validation(res, { ownerId: "Select an active IT Staff or Administrator." });
+    if (body.confirmed !== undefined && typeof body.confirmed !== "boolean") return validation(res, { confirmed: "Confirmation must be true or false." });
+    const owner = await getPrisma().user.findFirst({ where: { id: ownerId, isActive: true, role: { in: ["IT_STAFF", "ADMINISTRATOR"] } }, select: { id: true } });
+    if (!owner) return validation(res, { ownerId: "Select an active IT Staff or Administrator." });
+    if (ticket.ownerId === ownerId) return validation(res, { ownerId: "This user already owns the Ticket." });
+    if (ticket.ownerId !== null && body.confirmed !== true) return validation(res, { confirmed: "Confirm the reassignment." });
+    return { data: { ownerId, lastOwnerChangedAt: new Date(), lastOwnerChangedByUserId: actorId }, where: { ownerId: ticket.ownerId } };
+  }),
+);
+
+app.patch("/api/staff/tickets/:ticketId/it-priority", (req: Request, res: Response) =>
+  mutateTicket(req, res, ["itPriority", "version"], (body, _ticket, actorId) => {
+    if (typeof body.itPriority !== "string" || !["LOW", "MEDIUM", "HIGH"].includes(body.itPriority)) return validation(res, { itPriority: "IT Priority must be Low, Medium, or High." });
+    return { data: { itPriority: body.itPriority as "LOW" | "MEDIUM" | "HIGH", lastPriorityChangedAt: new Date(), lastPriorityChangedByUserId: actorId } };
+  }),
+);
+
+app.patch("/api/staff/tickets/:ticketId/status", (req: Request, res: Response) =>
+  mutateTicket(req, res, ["status", "version", "confirmed"], (body, ticket, actorId) => {
+    if (typeof body.status !== "string" || !(TICKET_STATUSES as readonly string[]).includes(body.status)) return validation(res, { status: "Select a valid status." });
+    if (body.confirmed !== undefined && typeof body.confirmed !== "boolean") return validation(res, { confirmed: "Confirmation must be true or false." });
+    const target = body.status as TicketStatusValue;
+    const rule = transitionRule(ticket.currentStatus, target);
+    if (!rule) {
+      sendError(res, 409, "INVALID_STATUS_TRANSITION", "That status change is not permitted from the current status.");
+      return { stop: true };
+    }
+    if (rule.ownerRequired && !(ticket.owner && ticket.owner.isActive && ["IT_STAFF", "ADMINISTRATOR"].includes(ticket.owner.role))) {
+      sendError(res, 409, "OWNER_REQUIRED", "Assign an owner first.");
+      return { stop: true };
+    }
+    if (rule.confirmationRequired && body.confirmed !== true) return validation(res, { confirmed: "Confirm this status change." });
+    return {
+      data: {
+        currentStatus: target,
+        lastStatusChangedAt: new Date(),
+        lastStatusChangedByUserId: actorId,
+        ...(rule.clearsRequesterSignal ? { requesterResolvedAt: null, requesterResolvedByUserId: null } : {}),
+      },
+      where: { currentStatus: ticket.currentStatus },
+    };
+  }),
+);
+
+app.get("/api/staff/tickets/:ticketId/internal-notes", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF", "ADMINISTRATOR"]);
+  if (!session) return;
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) {
+    sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+    return;
+  }
+  try {
+    const ticket = await getPrisma().ticket.findUnique({ where: { id: ticketId }, select: { id: true } });
+    if (!ticket) {
+      sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+      return;
+    }
+    const notes = await getPrisma().internalNote.findMany({ where: { ticketId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], include: commentInclude });
+    res.status(200).json({ data: notes.map(publicCommentView) });
+  } catch (error) {
+    ticketFailure(res, error, "GET internal notes", "Internal Notes could not be loaded.");
+  }
+});
+
+app.post("/api/staff/tickets/:ticketId/internal-notes", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF"]);
+  if (!session || !originAndCsrfValid(req, res, session)) return;
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) {
+    sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+    return;
+  }
+  const body = req.body;
+  if (!onlyKeys(body, "content")) {
+    sendError(res, 400, "MALFORMED_REQUEST", "Only content may be supplied.");
+    return;
+  }
+  try {
+    const ticket = await getPrisma().ticket.findUnique({ where: { id: ticketId }, select: { id: true } });
+    if (!ticket) {
+      sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+      return;
+    }
+    const content = typeof body.content === "string" ? body.content.trim() : "";
+    const length = Array.from(content).length;
+    if (length === 0 || length > MAX_COMMENT_LENGTH) {
+      sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", { content: length === 0 ? "Note is required." : `Note must contain ${MAX_COMMENT_LENGTH} characters or fewer.` });
+      return;
+    }
+    const note = await getPrisma().internalNote.create({ data: { ticketId, authorId: session.user.id, content }, include: commentInclude });
+    res.status(201).json({ data: publicCommentView(note) });
+  } catch (error) {
+    ticketFailure(res, error, "POST internal note", "Note could not be saved. Please try again.");
+  }
+});
+
 // These endpoint families are implemented by later Lab 3 issues. Keeping the
 // authorization boundary here makes direct calls fail safely now, rather than
 // relying on the client shell to hide unfinished destinations.
-app.all("/api/staff/assignees", async (req: Request, res: Response) => {
-  const session = await requireRole(req, res, ["IT_STAFF"]);
-  if (!session) return;
-  sendError(res, 501, "NOT_IMPLEMENTED", "This Staff capability is not available yet.");
-});
-
 app.all("/api/staff/*", async (req: Request, res: Response) => {
   const session = await requireRole(req, res, ["IT_STAFF", "ADMINISTRATOR"]);
   if (!session) return;
