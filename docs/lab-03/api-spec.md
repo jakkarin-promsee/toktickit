@@ -1,6 +1,6 @@
 # Lab 3 REST API Specification
 
-Status: Proposed contract for peer review under Issue #30
+Status: Approved REST contract from Issue #30 (PR #42), implemented by Issues #32–#37 and verified by the API, security, and E2E suites listed in `tests.md`
 
 Base URL: `/api`
 

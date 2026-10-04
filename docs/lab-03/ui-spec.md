@@ -1,6 +1,6 @@
 # Lab 3 UI Specification
 
-Status: Proposed visual and interaction contract for peer review under Issue #30
+Status: Visual and interaction contract from Issue #30; implementation conformance, completed visual checklist, and evidence recorded by Issue #40 (section 12)
 
 This document extends the approved Lab 2 Zen Green design and is normative for authentication, role-aware navigation, Requester regression, Staff Ticket Queue/Detail, read-only Administrator Ticket review, and minimalist User Management.
 
@@ -213,15 +213,54 @@ Every page has one `h1` and logical heading order. Fields and controls have acce
 
 ## 12. Visual evidence checklist
 
-- [ ] Login initial, validation, busy, generic authentication failure, rate limit, safe failure, and success routing match Zen Green.
-- [ ] Mandatory Change Password rules, validation, busy, failure, success, and blocked-navigation behavior are clear.
-- [ ] The shell shows correct name/role/navigation/Logout for Requester, IT Staff, and Administrator at all widths.
-- [ ] Requester Ticket Detail shows Public Comments and conditional Problem Appears Resolved without Internal Notes or formal workflow controls.
-- [ ] Staff Queue shows results, filters, sort, pagination, counts, assigned/unassigned ownership, empty, no-results, forbidden, failure, and equivalent mobile cards.
-- [ ] Staff Detail clearly separates read-only data, editable workflow cards, Public Comments, Internal Notes, and Attachments and includes confirmation/conflict states.
-- [ ] Administrator Ticket Review is visibly read-only and exposes no mutation or composition controls.
-- [ ] User Management shows list/cards, search/role filter, create/edit/reset panels, validation, success, duplicate, self-protection, last-admin, owner, stale, forbidden, and failure states.
-- [ ] Role, status, Requested Priority, IT Priority, account, and ownership badges use consistent text and do not depend on color.
-- [ ] Desktop, tablet, mobile, keyboard, focus, 200% zoom, clipping, overlap, and horizontal-overflow checks pass for every major screen.
+Completed under Issue #40 on 4 October 2026 from the `feature/40-lab3-visual-evidence` increment. Every item links to the screenshots and the automated checks that back it; screenshots are evidence for human review and do not replace the RESP-01, A11Y-01, and STYLE-01 assertions in `tests.md`.
 
-Screenshots belong under `artifacts/lab-03/screenshots/authentication/`, `staff-queue/`, `staff-ticket-detail/`, and `user-management/`; Requester regression evidence may use `artifacts/lab-03/screenshots/requester/` in addition to the handout minimum.
+- [x] Login initial, validation, busy, generic authentication failure, rate limit, safe failure, and success routing match Zen Green. Evidence: `authentication/{desktop,tablet,mobile}-login.png`, `desktop-login-validation.png`, `desktop-login-busy.png`, `desktop-login-failure.png`, `desktop-login-inactive.png`, `desktop-login-rate-limited.png`.
+- [x] Mandatory Change Password rules, validation, busy, failure, success, and blocked-navigation behavior are clear. Evidence: `authentication/{desktop,tablet,mobile}-change-password.png`, `desktop-change-password-validation.png`, `desktop-change-password-success.png`.
+- [x] The shell shows correct name/role/navigation/Logout for Requester, IT Staff, and Administrator at all widths. Evidence: `authentication/desktop-shell-staff.png`, `desktop-shell-administrator.png`, `mobile-shell-menu-open.png`, `desktop-access-restricted.png`, `desktop-after-logout-direct-url.png`.
+- [x] Requester Ticket Detail shows Public Comments and conditional Problem Appears Resolved without Internal Notes or formal workflow controls. Evidence: `requester/{desktop,tablet,mobile}-ticket-detail.png`, `desktop-problem-appears-resolved-dialog.png`, `desktop-problem-appears-resolved-confirmed.png`, `desktop-comment-validation.png`, `desktop-other-owner-not-found.png`.
+- [x] Staff Queue shows results, filters, sort, pagination, counts, assigned/unassigned ownership, empty, no-results, forbidden, failure, and equivalent mobile cards. Evidence: `staff-queue/{desktop,tablet,mobile}-queue.png`, `desktop-filtered-unassigned.png`, `desktop-pagination-page-1.png`, `desktop-pagination-page-2.png`, `mobile-pagination.png`, `desktop-no-results.png`, `desktop-loading.png`, `desktop-empty-mocked.png`, `desktop-failure-mocked.png`, `desktop-forbidden-mocked.png`.
+- [x] Staff Detail clearly separates read-only data, editable workflow cards, Public Comments, Internal Notes, and Attachments and includes confirmation/conflict states. Evidence: `staff-ticket-detail/{desktop,tablet,mobile}-detail-public-comments.png`, `-detail-internal-notes.png`, `-detail-attachments.png`, `desktop-unassigned-new.png`, `desktop-claim-success.png`, `desktop-reassign-dialog.png`, `desktop-reassign-success.png`, `desktop-requester-indication.png`, `desktop-confirmation-dialog.png`, `desktop-comment-validation.png`, `desktop-stale-conflict.png`.
+- [x] Administrator Ticket Review is visibly read-only and exposes no mutation or composition controls. Evidence: `staff-queue/{desktop,tablet,mobile}-admin-ticket-review.png`, `staff-ticket-detail/desktop-administrator-read-only.png`, `mobile-administrator-read-only.png`.
+- [x] User Management shows list/cards, search/role filter, create/edit/reset panels, validation, success, duplicate, self-protection, last-admin, owner, stale, forbidden, and failure states. Evidence: `user-management/{desktop,tablet,mobile}-user-list.png`, `desktop-role-filter.png`, `-create-panel.png`, `desktop-create-validation.png`, `desktop-duplicate-email.png`, `desktop-create-success.png`, `desktop-self-protection.png`, `desktop-confirm-deactivation.png`, `desktop-owner-conflict.png`, `desktop-reset-password-dialog.png`, `desktop-no-results.png`, `desktop-failure-mocked.png`, `desktop-non-administrator-forbidden.png`. The last-active-Administrator and stale-User conflicts are proven by E2E-04 and API-13 rather than a screenshot, because they need concurrent requests.
+- [x] Role, status, Requested Priority, IT Priority, account, and ownership badges use consistent text and do not depend on color. Evidence: shared components in `client/src/ui.tsx`, `client/tests/lab-03/ui-components.test.tsx`, and STYLE-01.
+- [x] Desktop, tablet, mobile, keyboard, focus, 200% zoom, clipping, overlap, and horizontal-overflow checks pass for every major screen. Evidence: RESP-01 in `e2e/lab-03/responsive.spec.ts` (1440×900, 820×1180, 390×844, and 720×450 for 200% zoom) and A11Y-01 in `e2e/lab-03/accessibility.spec.ts`.
+
+Screenshots belong under `artifacts/lab-03/screenshots/authentication/`, `staff-queue/`, `staff-ticket-detail/`, and `user-management/`; Requester regression evidence uses `artifacts/lab-03/screenshots/requester/`, and the before/after pairs for fixed defects use `artifacts/lab-03/screenshots/before-after/`.
+
+### Screenshot matrix
+
+| Major screen | Desktop 1440×900 | Tablet 820×1180 | Mobile 390×844 |
+| --- | --- | --- | --- |
+| Login | `authentication/desktop-login.png` | `authentication/tablet-login.png` | `authentication/mobile-login.png` |
+| Change Password | `authentication/desktop-change-password.png` | `authentication/tablet-change-password.png` | `authentication/mobile-change-password.png` |
+| Role shell and mobile menu | `authentication/desktop-shell-staff.png`, `desktop-shell-administrator.png` | Every tablet screenshot shows the inline shell | `authentication/mobile-shell-menu-open.png` |
+| Requester My Tickets | `requester/desktop-my-tickets.png` | `requester/tablet-my-tickets.png` | `requester/mobile-my-tickets.png` |
+| Requester Ticket Detail | `requester/desktop-ticket-detail.png` | `requester/tablet-ticket-detail.png` | `requester/mobile-ticket-detail.png` |
+| Staff Ticket Queue | `staff-queue/desktop-queue.png` | `staff-queue/tablet-queue.png` | `staff-queue/mobile-queue.png` |
+| Administrator Ticket Review | `staff-queue/desktop-admin-ticket-review.png` | `staff-queue/tablet-admin-ticket-review.png` | `staff-queue/mobile-admin-ticket-review.png` |
+| Staff Ticket Detail | `staff-ticket-detail/desktop-detail-public-comments.png` | `staff-ticket-detail/tablet-detail-public-comments.png` | `staff-ticket-detail/mobile-detail-public-comments.png` |
+| Internal Notes | `staff-ticket-detail/desktop-detail-internal-notes.png` | `staff-ticket-detail/tablet-detail-internal-notes.png` | `staff-ticket-detail/mobile-detail-internal-notes.png` |
+| Attachments | `staff-ticket-detail/desktop-detail-attachments.png` | `staff-ticket-detail/tablet-detail-attachments.png` | `staff-ticket-detail/mobile-detail-attachments.png` |
+| User Management list | `user-management/desktop-user-list.png` | `user-management/tablet-user-list.png` | `user-management/mobile-user-list.png` |
+| User Management create panel | `user-management/desktop-create-panel.png` | `user-management/tablet-create-panel.png` | `user-management/mobile-create-panel.png` |
+
+All screenshots are regenerated from a freshly seeded `lab3_e2e` schema with `npm run test:visual`, so they contain only synthetic `example.test` accounts. Password fields are always masked, no screenshot shows a password value, token, or cookie, and states that the seeded database cannot produce on demand (empty queue, forbidden, dependency failure, rate limit) use mocked HTTP responses and carry `-mocked` or a matching name.
+
+### Issue #40 defects fixed
+
+The automated audit found no page-level horizontal overflow or clipped control in the pre-fix screens at any viewport, but visual review found an unreadable tablet Queue table plus design-system, semantics, and keyboard defects against this specification. Before/after pairs for each major screen are in `artifacts/lab-03/screenshots/before-after/` (`before-*` captured before any change, `after-*` from the final run).
+
+| Defect | Spec reference | Fix |
+| --- | --- | --- |
+| Primary buttons, outline buttons, links, focus rings, and checkboxes used Bootstrap blue | §1, §3 Buttons | Bootstrap button, link, focus, and checkbox variables mapped onto the Zen Green tokens; destructive transitions and discard use danger styling; Internal Note posting uses the amber note button. |
+| All statuses shared one tint, and role badges showed raw enums such as `IT_STAFF` | §1 Badge vocabulary | Shared `StatusBadge`, `PriorityBadge`, `RoleBadge`, and `AccountBadge` in `client/src/ui.tsx` with per-value tints and full text everywhere. |
+| No Menu button below 768 px, no `aria-current`, no skip link | §2 | Rebuilt shell with a text-labelled Menu (`aria-expanded`, `aria-controls`, Escape returns focus), `aria-current="page"`, white focus ring on the green header, and a skip link. |
+| Administrator navigation lacked Ticket Review, although the read-only detail mode existed | §2, §7 | Administrators now see Users and Ticket Review; the existing queue and detail render read-only with the `Read-only administrator view` callout and no mutation controls. |
+| Confirmation and reset dialogs were inline cards without focus management | §3 Buttons and confirmation | Shared `ModalDialog`: labelled and described, initial focus on Cancel (first field for the reset form), Tab containment, Escape, and focus restored to the trigger. |
+| Required fields had no marker, errors were not linked, and validation did not move focus | §3 Fields and validation | Visible `*` with empty alternative text, `aria-required`, `aria-describedby` to the adjacent error, and focus on the first invalid field. |
+| Comment, Note, and Description areas were under 120 px; Create Ticket selects used the text-input class | §3 Fields and validation | Textareas are at least 120 px and vertically resizable; selects use `form-select`. |
+| Communication tabs had no arrow-key support and pointed `aria-controls` at panels that were not rendered | §8, §11 | Roving `tabindex` with Arrow, Home, and End keys, `aria-controls` only on the rendered panel, and selection shown with bold text and an inset bar rather than color alone. |
+| Read-only and editable areas relied on background tint only | §3, Issue #40 | `Read-only` and `Editable` text labels on Ticket information and workflow cards, plus inline read-only values. |
+| Mobile queue stacked 11 full-width filters before the first result | §7 Tablet and mobile | Filters use two columns on small screens, and Clear filters stays adjacent to them. |
+| At tablet width the Queue table broke Ticket Numbers across five lines, split `View` and `Last updated` mid-word, and split dates mid-number (`before-after/before-tablet-staff-queue.png`) | §7, §11 | Free-text wrapping now applies only to Summary; Ticket Number, headers, and View stay whole, priority badges stack, and multi-word statuses wrap inside their cell. RESP-01 caught one intermediate version that overflowed at 820 px before the final layout. Compare `before-after/after-tablet-staff-queue.png`. |
