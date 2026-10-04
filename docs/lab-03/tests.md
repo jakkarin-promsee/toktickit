@@ -1,6 +1,6 @@
 # Lab 3 Test Plan
 
-Status: Test DD contract created before Lab 3 production implementation; automated unit, API/integration, security, migration, regression, UI component, and UI style results recorded by Issue #38. E2E, responsive, accessibility, and visual rows remain planned for Issue #39 and later evidence Issues.
+Status: Test DD contract created before Lab 3 production implementation; automated unit, API/integration, security, migration, regression, UI component, and UI style results recorded by Issue #38; browser E2E results recorded by Issue #39. Responsive, accessibility, and visual rows remain planned for Issue #40.
 
 Last updated: 4 October 2026
 
@@ -21,7 +21,7 @@ Test isolation uses disposable PostgreSQL schemas, independently hashed test pas
 
 ## 2. Test matrix
 
-Final status values: `Pass` means the listed files passed in both full-suite runs recorded in section 9 on 4 October 2026; `Planned (#39)` means the row is owned by the Lab 3 E2E/evidence Issues and has no result yet.
+Final status values: `Pass` means the listed files passed in both consecutive runs recorded in section 10 on 4 October 2026; `Planned (#40)` means the row is owned by the responsive, accessibility, and visual evidence Issue and has no result yet.
 
 | Test ID | Type | Requirement / AC | What it verifies | Expected result | Actual automated file | Final status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -58,14 +58,14 @@ Final status values: `Pass` means the listed files passed in both full-suite run
 | UI-06 | UI component | FR-12–FR-17 / AC-12–AC-16 | Staff Detail groups, claim/reassign, priority, next statuses, owner-disabled transitions, confirmations, stale refresh, separate Public/Internal drafts, Attachments, and safe states | Correct controls by mode; drafts persist on failure; Internal/Public distinction cannot be confused | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Pass |
 | UI-07 | UI component | FR-18–FR-22 / AC-17–AC-21 | User list/search/filter/table/cards, create/edit/full validation, exactly one role, duplicate email, dirty close, version conflict, self-deactivation, last active Administrator, owner conflict, initial password reset warning, success, forbidden, and failure | Minimalist workflow is complete, safe, accessible, and retains input on recoverable errors | `client/tests/lab-03/UserManagement.test.tsx` | Pass |
 | STYLE-01 | UI style | FR-26 / AC-23 | Zen Green tokens, Internal Note tokens, theme activation, shell/card/badge/read-only/note hooks, focus-visible outline, long-content wrapping, and the mobile breakpoint | Required visual/semantic hooks exist and meaning never depends on color alone | `client/tests/lab-03/zen-green-style.test.tsx` | Pass |
-| RESP-01 | Responsive | FR-26 / AC-23 | Login, Change Password, Requester Detail, Queue, Staff Detail, User Management, and shell at 1440×900, 820×1180, and 390×844 plus 200% zoom | No page overflow, clipping, overlap, covered focus, hidden action, or information loss across table/card changes | `e2e/lab-03/responsive.spec.ts` | Planned (#39) |
+| RESP-01 | Responsive | FR-26 / AC-23 | Login, Change Password, Requester Detail, Queue, Staff Detail, User Management, and shell at 1440×900, 820×1180, and 390×844 plus 200% zoom | No page overflow, clipping, overlap, covered focus, hidden action, or information loss across table/card changes | `e2e/lab-03/responsive.spec.ts` | Planned (#40) |
 | REG-01 | Regression | FR-06–FR-08, FR-24 / BR-18, BR-44–BR-45, BR-48 / AC-06–AC-08, AC-22 | Lab 1 references and Lab 2 Ticket Number, validation, create/list/detail, query, Attachment lifecycle, removed selector API, and migrated data under authenticated Requester | All retained behavior passes; only selector/header assumptions are replaced | `server/tests/lab-01/*.test.ts`; `server/tests/lab-02/*.test.ts`; `server/tests/lab-03/data-migration.test.ts`; `client/tests/lab-03/RequesterCreateTicket.test.tsx`; `client/tests/lab-03/RequesterTicketDetail.test.tsx` | Pass |
-| A11Y-01 | Accessibility | FR-26 / AC-23 | Keyboard-only login, password change, queue/detail actions, dialogs, Comments/Notes, user panels, heading order, labels, errors/live regions, focus restore, and 200% zoom | Logical visible focus and complete operation with no keyboard trap or inaccessible feedback | `e2e/lab-03/accessibility.spec.ts` | Planned (#39) |
-| VISUAL-01 | Visual | FR-26 / AC-23, AC-25 | Named required screen states and three viewport captures with checklist review for design, role navigation, badges, editable/read-only, validation, focus, clipping, overlap, and overflow | Readable approved screenshots match `ui-spec.md`; visual review supplements rather than replaces assertions | `e2e/lab-03/visual-evidence.spec.ts` and `artifacts/lab-03/screenshots/` | Planned (#39) |
-| E2E-01 | E2E | FR-01–FR-05 / AC-01–AC-05 | Valid/invalid/inactive/rate-limited login, mandatory first login change, role home, session reload, voluntary change, logout, and blocked direct access afterward | Complete authentication lifecycle works with real cookie/CSRF/database and safe feedback | `e2e/lab-03/authentication.spec.ts` | Planned (#39) |
-| E2E-02 | E2E | FR-06–FR-10 / AC-06–AC-10 | Migrated Requester login, create/find/open Ticket, Comment, Attachment lifecycle, resolution signal, cross-owner direct URL/API, and removed selector/state | Owned Requester workflow succeeds with no selectable/forgeable identity or cross-owner leak | `e2e/lab-03/requester-ticket-flow.spec.ts` | Planned (#39) |
-| E2E-03 | E2E | FR-11–FR-17 / AC-11–AC-16 | Queue search/filter/sort/page, open unassigned Ticket, claim/reassign, IT Priority, permitted statuses, Public Comment, Internal Note, Attachments, stale conflict, and Administrator read-only review | Complete Staff workflow follows matrix; public/internal content remains distinct; Admin cannot mutate | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned (#39) |
-| E2E-04 | E2E | FR-18–FR-22 / AC-17–AC-21 | User list/search/filter, create, duplicate email, invalid values, edit, exactly one role, activate/deactivate, initial password reset/change, self-deactivation, last active Administrator, owner conflict, and non-Administrator access | Complete minimalist administration succeeds and every safety rule is observable | `e2e/lab-03/user-administration.spec.ts` | Planned (#39) |
+| A11Y-01 | Accessibility | FR-26 / AC-23 | Keyboard-only login, password change, queue/detail actions, dialogs, Comments/Notes, user panels, heading order, labels, errors/live regions, focus restore, and 200% zoom | Logical visible focus and complete operation with no keyboard trap or inaccessible feedback | `e2e/lab-03/accessibility.spec.ts` | Planned (#40) |
+| VISUAL-01 | Visual | FR-26 / AC-23, AC-25 | Named required screen states and three viewport captures with checklist review for design, role navigation, badges, editable/read-only, validation, focus, clipping, overlap, and overflow | Readable approved screenshots match `ui-spec.md`; visual review supplements rather than replaces assertions | `e2e/lab-03/visual-evidence.spec.ts` and `artifacts/lab-03/screenshots/` | Planned (#40) |
+| E2E-01 | E2E | FR-01–FR-05 / AC-01–AC-05 | Valid login with shell name and role, reload keeps the session, invalid and inactive login with the same safe copy and no session, local validation, first-login user blocked in UI and API until a valid change, short-password rejection, old password refused afterwards, role-specific navigation, forbidden direct URLs, logout, and direct UI/API access blocked after logout | Complete authentication lifecycle works with real cookie/CSRF/database and safe feedback | `e2e/lab-03/authentication.spec.ts` | Pass |
+| E2E-02 | E2E | FR-06–FR-10 / AC-06–AC-10 | Authenticated Requester creates a Ticket with no selector and finds it in My Tickets, posts a Public Comment, confirms Problem Appears Resolved without a status change, and is refused another Requester's Ticket, comments, and every Internal Note path through UI and direct API, including a forged `X-Requester-Id` | Owned Requester workflow succeeds with no selectable/forgeable identity or cross-owner leak | `e2e/lab-03/requester-ticket-flow.spec.ts` | Pass |
+| E2E-03 | E2E | FR-11–FR-17 / AC-11–AC-16 | Queue with seeded owners/statuses, search, owner and status filters, ticket-number sort both ways, 12-Ticket pagination, no-results, open detail from the queue, claim, confirmed reassign, IT Priority, Open → In Progress → confirmed Resolved, Public Comment vs Internal Note separation seen by the Requester, Attachment download bytes, forbidden `CLOSED` jump, stale-version Refresh, and Administrator read-only direct API | Complete Staff workflow follows the matrix; public/internal content remains distinct; Admin cannot mutate | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| E2E-04 | E2E | FR-18–FR-22 / AC-17–AC-21 | User list columns, search, role filter, create with one role, duplicate email kept in the form, edit name, deactivate (login then fails) and reactivate, new initial password with forced change at next login, self-deactivation blocked in UI and API, two concurrent Administrator deactivations leaving one active Administrator, and Requester/Staff blocked in UI and API | Complete minimalist administration succeeds and every safety rule is observable | `e2e/lab-03/user-administration.spec.ts` | Pass |
 
 ## 3. Acceptance Criterion traceability
 
@@ -98,11 +98,11 @@ Final status values: `Pass` means the listed files passed in both full-suite run
 | AC-25 | REG-01, RESP-01, A11Y-01, VISUAL-01, E2E-01, E2E-02, E2E-03, E2E-04 plus complete-suite output |
 | AC-26 | DOC-01 plus the human Reviewer checklist in `specification.md` |
 
-Every AC has at least one automated target. After Issue #38, every AC except AC-23's responsive/accessibility/visual part and AC-25's E2E part already has at least one passing automated test; those remaining parts are owned by Issue #39 and the evidence Issues. Human peer review and visual inspection supplement but do not replace DOC-01, responsive, accessibility, security, or E2E assertions.
+Every AC has at least one automated target. After Issue #39, every AC except the responsive/accessibility/visual part of AC-23 and AC-25 has at least one passing automated test, including a passing browser E2E test for AC-01 to AC-21; the remaining parts are owned by Issue #40. Human peer review and visual inspection supplement but do not replace DOC-01, responsive, accessibility, security, or E2E assertions.
 
 ## 4. Functional Requirement traceability
 
-| Functional requirement | Passing automated evidence | Planned evidence |
+| Functional requirement | Passing automated evidence | Browser E2E (Pass) or planned evidence |
 | --- | --- | --- |
 | FR-01 Authentication | API-01, UNIT-01, UNIT-02, UI-01 | E2E-01 |
 | FR-02 Initial-password gate | API-02, SEC-02, UI-02, UI-03 | E2E-01 |
@@ -166,6 +166,15 @@ Isolation rules verified by Issue #38:
 - `safe-failures.api.test.ts` replaces the Prisma client only inside its own module scope, so other files keep the real database.
 - `grep -rnE "\.(skip|only|todo)\(|\bxit\(|\bxdescribe\(" server/tests client/tests` returns no matches.
 
+E2E isolation rules added by Issue #39:
+
+- `playwright.config.ts` points the API at the `lab3_e2e` schema and `.tmp/playwright-attachments`, starts its own API on port 3100 and client on 5174 with `reuseExistingServer: false`, and sets `CLIENT_ORIGIN` to the E2E client.
+- `LAB3_SEED_INITIAL_PASSWORD` is generated per run when not supplied, so no real or committed password is used.
+- `e2e/global-setup.ts` force-resets the E2E schema, seeds it, and clears `mustChangePassword` on the seeded accounts only in that schema; it refuses to run against `public`. First-login behavior uses accounts that each spec creates.
+- Every spec creates its own Tickets and Users with unique names, and the concurrent Administrator test restores the seeded Administrator, so tests do not depend on order or leftovers.
+- Specs use roles, labels, and accessible names, and wait with web-first assertions or `expect.poll`; there are no fixed sleeps.
+- `grep -rnE "\.(skip|only|fixme)\(" e2e` returns no matches.
+
 ## 8. Responsive, accessibility, and visual checklist
 
 For Login, Change Password, Requester Ticket Detail, Staff Queue, Staff Ticket Detail, User Management, and the role shell at 1440×900, 820×1180, and 390×844, plus 200% zoom where supported:
@@ -202,8 +211,11 @@ npm run test:lab3:rerun
 npm --prefix server run build
 npm --prefix client run build
 
-# Lab 3 E2E, responsive, accessibility, and visual evidence (Issue #39)
-npx playwright test e2e/lab-03
+# Lab 3 browser E2E (starts its own API on 3100 and client on 5174)
+npm run test:e2e
+
+# Same E2E suite twice in a row
+npm run test:e2e:rerun
 ```
 
 The server suite needs the local PostgreSQL from the README; `TEST_DATABASE_URL` and `TEST_ATTACHMENT_STORAGE` override the default isolated schema and storage path.
@@ -221,7 +233,9 @@ The server suite needs the local PostgreSQL from the README; `TEST_DATABASE_URL`
 | Lab 3 client files | Pass: `AppShell` 3, `ChangePassword` 6, `Login` 8, `RequesterCreateTicket` 3, `RequesterTicketDetail` 10, `StaffTicketDetail` 11, `StaffTicketQueue` 10, `UserManagement` 13, `zen-green-style` 5 | Same run |
 | Production builds | Pass | `npm --prefix server run build`; `npm --prefix client run build` on 4 October 2026 |
 | Skipped/focused tests | None | `grep` command in section 7 returns no matches |
-| Responsive, accessibility, visual, and E2E | Planned (#39) | `e2e/lab-03/` is still empty; no result is claimed |
+| Browser E2E | Pass: 4 files, 20 tests, run 1 and run 2 (no retries, no flaky) | `npm run test:e2e:rerun` on 4 October 2026 |
+| E2E files | Pass: `authentication.spec.ts` 5, `requester-ticket-flow.spec.ts` 3, `staff-ticket-flow.spec.ts` 6, `user-administration.spec.ts` 6 | Same run |
+| Responsive, accessibility, and visual | Planned (#40) | No result is claimed |
 | Peer review and approval | Pending human review | Record actual reviewer/comments/responses/approval later in `docs/lab-03/reviewer.md` |
 
 ## 11. Issue #38 coverage audit
@@ -244,7 +258,9 @@ Production code was not changed in Issue #38; no new test revealed a defect.
 
 ## 12. Known limitations
 
-- E2E, responsive, accessibility, and visual rows remain `Planned (#39)`; Issue #38 does not implement Playwright tests.
+- Responsive, accessibility, and visual rows remain `Planned (#40)`; the Issue #39 E2E suite runs at the default desktop viewport only.
+- E2E login rate limiting is not exercised in the browser because the limiter is per email and IP; it is covered by API-01.
+- Playwright keeps traces and screenshots only on failure; they can contain the synthetic per-run seed password typed into the login form, which is generated at runtime and never a real credential.
 - The login limiter is in-memory per server process, so its tests cover one process only; a restart clears the counter by design for the local lab.
 - Login enumeration is checked by response equality only; timing is not measured and no formal side-channel resistance is claimed.
 - FAIL-01 forces failures through a mocked Prisma client rather than a real database outage, and covers the session-lookup failure path for authenticated endpoints rather than every individual query inside each route.
