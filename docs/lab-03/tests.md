@@ -243,7 +243,7 @@ The server suite needs the local PostgreSQL from the README; `TEST_DATABASE_URL`
 | Browser E2E, responsive, and accessibility | Pass: 6 files, 58 tests, run 1 and run 2 (no retries, no flaky) | `npm run test:e2e:rerun` on 4 October 2026 |
 | E2E files | Pass: `authentication.spec.ts` 5, `requester-ticket-flow.spec.ts` 3, `staff-ticket-flow.spec.ts` 6, `user-administration.spec.ts` 6, `responsive.spec.ts` 28, `accessibility.spec.ts` 10 | Same run |
 | Visual evidence | Pass: 1 file, 9 tests; 110 screenshots (80 evidence and 30 before/after) | `npm run test:visual` on a fresh seed on 4 October 2026 |
-| Peer review and approval | Pending human review | Record actual reviewer/comments/responses/approval later in `docs/lab-03/reviewer.md` |
+| Peer review and approval | Complete: PRs #42–#53 approved and merged into `lab3-staging`, and release PR #54 approved and merged into `main` | `docs/lab-03/reviewer.md` |
 
 ## 11. Issue #38 coverage audit
 
@@ -275,4 +275,4 @@ Production code was not changed in Issue #38; no new test revealed a defect.
 - Login enumeration is checked by response equality only; timing is not measured and no formal side-channel resistance is claimed.
 - FAIL-01 forces failures through a mocked Prisma client rather than a real database outage, and covers the session-lookup failure path for authenticated endpoints rather than every individual query inside each route.
 - Attachment storage-write failure, orphan cleanup, and concurrent active-limit races are not separately exercised at the Lab 3 API level; the Lab 2 validation and lifecycle suites remain the evidence for Attachment continuity.
-- Client UI tests use mocked HTTP responses; real browser/API integration is covered by the planned E2E suite.
+- Client UI tests use mocked HTTP responses; real browser/API integration is covered by the E2E suite (E2E-01 to E2E-04).
