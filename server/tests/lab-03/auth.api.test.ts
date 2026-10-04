@@ -26,6 +26,7 @@ describe("API-01/API-02 authentication", () => {
   });
 
   it("creates a limited session, requires CSRF to change the initial password, rotates it, and logs out", async () => {
+    await getPrisma().user.update({ where: { email: "anan@example.test" }, data: { mustChangePassword: true } });
     const agent = request.agent(app);
     const login = await agent.post("/api/auth/login").set("Origin", origin).send({ email: "  anan@example.test ", password: initialPassword });
     expect(login.status).toBe(200);
