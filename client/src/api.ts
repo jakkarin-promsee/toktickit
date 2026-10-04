@@ -21,7 +21,7 @@ export interface CreatedTicket {
   relatedSystem: RelatedSystem;
   summary: string;
   requestedPriority: RequestedPriority;
-  itPriority: "UNASSIGNED";
+  itPriority: "LOW" | "MEDIUM" | "HIGH";
   currentStatus: "NEW";
   description: string;
   createdAt: string;
@@ -59,15 +59,16 @@ export interface TicketDetail extends CreatedTicket {
 }
 
 export async function uploadAttachment(
-  requesterId: number,
   ticketId: string,
   file: File,
+  csrfToken: string,
 ): Promise<TicketAttachmentMetadata> {
   const form = new FormData();
   form.append("file", file);
   const response = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
     method: "POST",
-    headers: { "X-Requester-Id": String(requesterId) },
+    credentials: "include",
+    headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken },
     body: form,
   });
   const payload = (await response.json()) as {
@@ -85,16 +86,18 @@ export async function uploadAttachment(
 }
 
 export async function removeAttachment(
-  requesterId: number,
   attachmentId: string,
   reason: string,
+  csrfToken: string,
 ): Promise<TicketAttachmentMetadata> {
   const response = await fetch(`${API_URL}/api/attachments/${attachmentId}`, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
-      "X-Requester-Id": String(requesterId),
+      Origin: window.location.origin,
+      "X-CSRF-Token": csrfToken,
     },
+    credentials: "include",
     body: JSON.stringify({ reason }),
   });
   const payload = (await response.json()) as {
@@ -112,12 +115,11 @@ export function attachmentDownloadUrl(attachmentId: string, inline = false): str
 }
 
 export async function downloadAttachment(
-  requesterId: number,
   attachmentId: string,
   inline = false,
 ): Promise<Blob> {
   const response = await fetch(attachmentDownloadUrl(attachmentId, inline), {
-    headers: { "X-Requester-Id": String(requesterId) },
+    credentials: "include",
   });
   if (!response.ok) {
     throw new Error("Attachment could not be downloaded.");
@@ -147,12 +149,6 @@ export interface TicketListResponse {
     hasPreviousPage: boolean;
     hasNextPage: boolean;
   };
-}
-
-export interface DevelopmentRequester {
-  id: number;
-  displayName: string;
-  email: string;
 }
 
 export interface SystemStatus {
@@ -216,28 +212,6 @@ export async function checkSystem(): Promise<SystemStatus> {
   return { online: true, categories: payload as Category[] };
 }
 
-export async function getDevelopmentRequesters(): Promise<
-  DevelopmentRequester[]
-> {
-  const response = await fetch(`${API_URL}/api/requesters`);
-
-  if (!response.ok) {
-    throw new Error(`Requester list failed with HTTP ${response.status}`);
-  }
-
-  const payload: unknown = await response.json();
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !Array.isArray((payload as { data?: unknown }).data) ||
-    !(payload as { data: unknown[] }).data.every(isRequester)
-  ) {
-    throw new Error("Requester list returned an unexpected payload");
-  }
-
-  return (payload as { data: DevelopmentRequester[] }).data;
-}
-
 async function getReferenceItems(path: string): Promise<Category[]> {
   const response = await fetch(`${API_URL}${path}`);
   if (!response.ok) {
@@ -259,7 +233,6 @@ export function getRelatedSystems(): Promise<RelatedSystem[]> {
 }
 
 export async function getMyTickets(
-  requesterId: number,
   query: TicketListQuery = {},
 ): Promise<TicketListResponse> {
   const params = new URLSearchParams();
@@ -269,7 +242,7 @@ export async function getMyTickets(
   const queryString = params.toString();
   const response = await fetch(
     `${API_URL}/api/tickets${queryString ? `?${queryString}` : ""}`,
-    { headers: { "X-Requester-Id": String(requesterId) } },
+    { credentials: "include" },
   );
   const payload = (await response.json()) as {
     data?: TicketListItem[];
@@ -283,11 +256,10 @@ export async function getMyTickets(
 }
 
 export async function getTicketDetail(
-  requesterId: number,
   ticketId: string,
 ): Promise<TicketDetail> {
   const response = await fetch(`${API_URL}/api/tickets/${ticketId}`, {
-    headers: { "X-Requester-Id": String(requesterId) },
+    credentials: "include",
   });
   const payload = (await response.json()) as {
     data?: TicketDetail;
@@ -306,7 +278,6 @@ export async function getTicketDetail(
 }
 
 export async function createTicket(
-  requesterId: number,
   input: {
     categoryId: number;
     relatedSystemId: number;
@@ -314,13 +285,16 @@ export async function createTicket(
     requestedPriority: RequestedPriority;
     description: string;
   },
+  csrfToken: string,
 ): Promise<CreatedTicket> {
   const response = await fetch(`${API_URL}/api/tickets`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Requester-Id": String(requesterId),
+      Origin: window.location.origin,
+      "X-CSRF-Token": csrfToken,
     },
+    credentials: "include",
     body: JSON.stringify(input),
   });
   const payload = (await response.json()) as {
@@ -396,15 +370,5 @@ function isCategory(value: unknown): value is Category {
     value !== null &&
     typeof (value as Category).id === "number" &&
     typeof (value as Category).name === "string"
-  );
-}
-
-function isRequester(value: unknown): value is DevelopmentRequester {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as DevelopmentRequester).id === "number" &&
-    typeof (value as DevelopmentRequester).displayName === "string" &&
-    typeof (value as DevelopmentRequester).email === "string"
   );
 }
