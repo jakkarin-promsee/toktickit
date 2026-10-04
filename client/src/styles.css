@@ -170,3 +170,21 @@ body {
   font-weight: inherit;
   text-decoration: none;
 }
+
+:root {
+  --note: #fff8e1;
+  --note-border: #c58a00;
+}
+
+.note-surface {
+  background: var(--note);
+  border: 1px solid var(--note-border);
+  border-radius: 8px;
+}
+
+.readonly-fields dd {
+  background: var(--readonly);
+  border-radius: 4px;
+  padding: 4px 8px;
+  overflow-wrap: anywhere;
+}

@@ -429,3 +429,49 @@ export async function getStaffQueue(search: string): Promise<StaffQueueResponse>
   if (!response.ok || !payload.data || !payload.pagination || !payload.counts) throw new ApiError(response.status, payload);
   return payload as StaffQueueResponse;
 }
+
+export interface PersonRef { id: number; displayName: string; role?: UserRole }
+
+export interface StaffTicketDetail {
+  id: string;
+  ticketNumber: string;
+  summary: string;
+  description: string;
+  requester: PersonRef;
+  category: Category;
+  relatedSystem: RelatedSystem;
+  requestedPriority: RequestedPriority;
+  itPriority: RequestedPriority;
+  currentStatus: TicketStatus;
+  owner: PersonRef | null;
+  requesterResolvedAt: string | null;
+  requesterResolvedBy: PersonRef | null;
+  lastStatusChangedAt: string | null;
+  lastStatusChangedBy: PersonRef | null;
+  lastOwnerChangedAt: string | null;
+  lastOwnerChangedBy: PersonRef | null;
+  lastPriorityChangedAt: string | null;
+  lastPriorityChangedBy: PersonRef | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+  attachments: TicketAttachmentMetadata[];
+  publicComments?: PublicComment[];
+  internalNotes?: PublicComment[];
+}
+
+export function getStaffTicketDetail(ticketId: string): Promise<StaffTicketDetail> {
+  return authRequest<StaffTicketDetail>(`/api/staff/tickets/${ticketId}`);
+}
+
+export function getAssignees(): Promise<PersonRef[]> {
+  return authRequest<PersonRef[]>("/api/staff/assignees");
+}
+
+export function staffMutation(path: string, method: "POST" | "PATCH", body: Record<string, unknown>, csrfToken: string): Promise<StaffTicketDetail> {
+  return authRequest<StaffTicketDetail>(`/api/staff/tickets/${path}`, { method, headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify(body) });
+}
+
+export function postInternalNote(ticketId: string, content: string, csrfToken: string): Promise<PublicComment> {
+  return authRequest<PublicComment>(`/api/staff/tickets/${ticketId}/internal-notes`, { method: "POST", headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify({ content }) });
+}
