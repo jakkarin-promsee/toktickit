@@ -213,7 +213,7 @@ Every page has one `h1` and logical heading order. Fields and controls have acce
 
 ## 12. Visual evidence checklist
 
-Completed under Issue #40 on 4 October 2026 from the `feature/40-lab3-visual-evidence` increment. Every item links to the screenshots and the automated checks that back it; screenshots are evidence for human review and do not replace the RESP-01, A11Y-01, and STYLE-01 assertions in `tests.md`.
+Completed under Issue #40 on 4 October 2026, and every screenshot was regenerated from final `main` after release PR #54 with `npm run test:visual`. Every item links to the screenshots and the automated checks that back it; screenshots are evidence for human review and do not replace the RESP-01, A11Y-01, and STYLE-01 assertions in `tests.md`.
 
 - [x] Login initial, validation, busy, generic authentication failure, rate limit, safe failure, and success routing match Zen Green. Evidence: `authentication/{desktop,tablet,mobile}-login.png`, `desktop-login-validation.png`, `desktop-login-busy.png`, `desktop-login-failure.png`, `desktop-login-inactive.png`, `desktop-login-rate-limited.png`.
 - [x] Mandatory Change Password rules, validation, busy, failure, success, and blocked-navigation behavior are clear. Evidence: `authentication/{desktop,tablet,mobile}-change-password.png`, `desktop-change-password-validation.png`, `desktop-change-password-success.png`.

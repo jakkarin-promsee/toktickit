@@ -47,3 +47,8 @@
 4. Rechecking the original lab sheet is useful near the end of the project. After working on many Issues, it is easy to focus only on the implementation and forget a document, evidence item, or submission requirement. A final requirement audit helps find those missing parts.
 
 5. I should keep important decisions under my control. I prefer letting the AI implement, test, and report readiness first, while I review the changes before allowing commits, PRs, or final integration.
+
+6. I learned to use the AI in two different roles and to keep them separate:
+	1. As a specification agent, it helped me turn the long lab sheet into `specification.md`, `tests.md`, `ui-spec.md`, and `api-spec.md`, and to find conflicts, missing rules, and untestable criteria before any code existed. My job in this role was to make the decisions the handout left open, such as the session approach, password rules, and the status-transition matrix.
+	2. As a coding agent, it implemented each Issue against that approved contract instead of its own ideas. The contract test, the Definition of Done, and the rule that nothing is marked Pass without a recorded run stopped it from adding scope or claiming work was finished early.
+	3. Separating the roles helped most when the two disagreed. When the coding agent found that the screens did not match `ui-spec.md` in Issue #40, the fix followed the specification, and the one change that looked like a new feature (the Administrator Ticket Review) was accepted only because the approved specification already required it.

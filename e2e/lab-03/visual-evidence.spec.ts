@@ -43,6 +43,8 @@ test.describe("VISUAL-01 screenshot evidence @visual", () => {
       await page.screenshot({ path: `${root}/before-after/after-${v}-login.png`, fullPage: true, animations: "disabled" });
 
       await signInReady(page, accounts.pim.email);
+      // Wait for the list itself, not just the shell, so the evidence never shows "Loading tickets…".
+      await expect(page.getByRole("link", { name: new RegExp(tickets.pimWaiting.summary) })).toBeVisible();
       await shot(page, "requester", `${v}-my-tickets`);
       await page.goto(`/tickets/${tickets.pimWaiting.id}`);
       await expect(page.getByRole("heading", { name: tickets.pimWaiting.summary })).toBeVisible();
@@ -139,6 +141,7 @@ test.describe("VISUAL-01 screenshot evidence @visual", () => {
     for (const [account, name] of [[accounts.narin, "staff"], [accounts.araya, "administrator"]] as const) {
       await page.getByRole("button", { name: "Logout" }).click();
       await signInReady(page, account.email);
+      await expect(page.getByText(/^Loading /)).toHaveCount(0);
       await shot(page, "authentication", `desktop-shell-${name}`, false);
     }
     await page.goto("/tickets");
