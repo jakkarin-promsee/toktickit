@@ -1,6 +1,6 @@
 # Lab 3 — Peer Review Record
 
-Status: Issues #30–#39 are complete. Feature PRs #42–#51 were peer-approved and merged into `lab3-staging`. The Issue #40 PR and the Issue #41 release PR from `lab3-staging` to `main` are added below once they are reviewed. Every link points to the review, line comment, or PR on GitHub.
+Status: Issues #30–#40 are complete. Feature PRs #42–#52 were peer-approved and merged into `lab3-staging`, and the release-check fix #53 follows the same flow. The Issue #41 release PR from `lab3-staging` to `main` is added below once it is reviewed. Every link points to the review, line comment, or PR on GitHub.
 
 | Role              | Full Name         | Student ID  | GitHub username                                          |
 | ----------------- | ----------------- | ----------- | -------------------------------------------------------- |
@@ -25,7 +25,7 @@ Status: Issues #30–#39 are complete. Feature PRs #42–#51 were peer-approved 
 | [#49](https://github.com/jakkarin-promsee/toktickit/pull/49)     | #37   | Administrator User Management with account safety rules                       | `feature/37-admin-user-management`         | [Review](https://github.com/jakkarin-promsee/toktickit/pull/49#pullrequestreview-5403900773) | ✅ Approved and merged |
 | [#50](https://github.com/jakkarin-promsee/toktickit/pull/50)     | #38   | Automated test coverage and traceability                                      | `feature/38-lab3-test-traceability`        | [Review](https://github.com/jakkarin-promsee/toktickit/pull/50#pullrequestreview-5403967191) | ✅ Approved and merged |
 | [#51](https://github.com/jakkarin-promsee/toktickit/pull/51)     | #39   | End-to-end workflows                                                          | `feature/39-lab3-e2e`                      | [Review](https://github.com/jakkarin-promsee/toktickit/pull/51#pullrequestreview-5404021900) | ✅ Approved and merged |
-| [#TODO](https://github.com/jakkarin-promsee/toktickit/pull/TODO) | #40   | Responsive, accessibility, Zen Green visual evidence, and Lab 3 documentation | `feature/40-lab3-visual-evidence`          | [Review](https://github.com/jakkarin-promsee/toktickit/pull/TODO)                            | ⏳ TODO after review   |
+| [#52](https://github.com/jakkarin-promsee/toktickit/pull/52) | #40   | Responsive, accessibility, Zen Green visual evidence, and Lab 3 documentation | `feature/40-lab3-visual-evidence`          | [Review](https://github.com/jakkarin-promsee/toktickit/pull/52#pullrequestreview-5405192308) | ✅ Approved and merged |
 | [#TODO](https://github.com/jakkarin-promsee/toktickit/pull/TODO) | #41   | Release Lab 3 from lab3-staging to main                                       | `lab3-staging`                             | [Review](https://github.com/jakkarin-promsee/toktickit/pull/TODO)                            | ⏳ TODO after review   |
 
 ### PRs I reviewed — authored by my partner
@@ -41,7 +41,8 @@ Status: Issues #30–#39 are complete. Feature PRs #42–#51 were peer-approved 
 | [#53](https://github.com/UsernameJillzaza/toktickit/pull/53)     | #43   | Public comments, internal notes, and Problem Appears Resolved            | `feature/43-comments-notes`       | [Review](https://github.com/UsernameJillzaza/toktickit/pull/53#pullrequestreview-5403673310) | ✅ Approved and merged |
 | [#54](https://github.com/UsernameJillzaza/toktickit/pull/54)     | #44   | Administrator user management with self-protection and last-admin safety | `feature/44-admin-users`          | [Review](https://github.com/UsernameJillzaza/toktickit/pull/54#pullrequestreview-5403684720) | ✅ Approved and merged |
 | [#55](https://github.com/UsernameJillzaza/toktickit/pull/55)     | #45   | Lab 3 Playwright suite, responsive checks, and screenshot evidence       | `feature/45-e2e-evidence`         | [Review](https://github.com/UsernameJillzaza/toktickit/pull/55#pullrequestreview-5403693192) | ✅ Approved and merged |
-| [#TODO](https://github.com/jakkarin-promsee/toktickit/pull/TODO) | #46   |                                                                          |                                   |                                                                                              | ⏳ TODO after review   |
+| [#56](https://github.com/UsernameJillzaza/toktickit/pull/56) | #46   | Lab 3 documentation: final test results, visual checklist, AI use, reviewer, README | `feature/46-docs` | [Review](https://github.com/UsernameJillzaza/toktickit/pull/56#pullrequestreview-5405174227) | ✅ Approved and merged |
+| [#57](https://github.com/UsernameJillzaza/toktickit/pull/57) | Docs  | Docs follow-up: record open review findings before the Lab 3 release | `docs/lab3-review-followups` | [Review](https://github.com/UsernameJillzaza/toktickit/pull/57#pullrequestreview-5405200151) | ✅ Approved and merged |
 
 ## Notable comments, responses, and resolutions
 

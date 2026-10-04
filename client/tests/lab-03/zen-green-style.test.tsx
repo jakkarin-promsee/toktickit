@@ -1,6 +1,9 @@
-import css from "../../src/styles.css?raw";
+import rawCss from "../../src/styles.css?raw";
 import app from "../../src/App.tsx?raw";
 import { describe, expect, it } from "vitest";
+
+// Git may check files out with CRLF line endings on Windows; normalize so multi-line selectors match on every checkout.
+const css = rawCss.replace(/\r\n/g, "\n");
 
 function block(selector: string): string {
   const start = css.indexOf(`${selector} {`);
