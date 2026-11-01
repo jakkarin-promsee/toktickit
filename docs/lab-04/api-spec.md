@@ -1,6 +1,6 @@
 # Lab 4 REST API Specification
 
-Status: Proposed Issue #57 contract; no Lab 4 endpoint is claimed implemented. Base URL `/api`; JSON request/response except the inherited Attachment endpoints. `specification.md` is normative for business rules, and the approved `../lab-03/api-spec.md` remains normative for unchanged routes.
+Status: Issue #57 contract, implemented and verified locally through Issue #62. Final verification on `main` is pending. Base URL `/api`; JSON request/response except the inherited Attachment endpoints. `specification.md` is normative for business rules, and the approved `../lab-03/api-spec.md` remains normative for unchanged routes.
 
 ## 1. Shared security, framing, and error rules
 

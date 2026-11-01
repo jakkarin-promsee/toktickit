@@ -1,6 +1,6 @@
 # Lab 4 Test DD and Traceability Plan
 
-Status: Final local verification for Issue #62. Every result below is tied to an executed test or manual isolated recovery rehearsal; real PR and independent peer review remain later workflow steps.
+Status: Local Issue #62 verification complete. The Issue #57 contract received actual peer approval in PR #64; the final `lab4-staging`/`main` run and remaining PR review evidence are pending. Every Pass result below is tied to an executed test or manual isolated recovery rehearsal.
 
 ## 1. Test method and environment
 
@@ -110,4 +110,8 @@ Each row is marked Pass only after the named test ran, with actual commands, env
 
 Manual acceptance is specified separately in `docs/lab-04/uat.md` as 50 step-by-step cases with a blank human execution log. Its `Not run` entries are intentionally independent of the automated Pass results above.
 
-Version history: 2026-10-31 — Issue #57 plan authored on `feature/57-lab4-engineering-contract-fake` before Lab 4 implementation; all statuses were Planned and independent review was pending. 2026-10-31 — Issue #61 dashboard evidence and executed row statuses added on `feature/61-lab4-role-dashboards-fake`. 2026-11-01 — Issue #62 local verification completed on `feature/62-lab4-final-hardening-fake`; no commit, PR, or independent review was created. Future entries must use actual dates, commits, PRs, reviewers, and executed results rather than inferred evidence.
+### Real feature branch verification (2026-11-01)
+
+After transferring Issues #57–#62 to the real feature-branch chain, the final `feature/62-lab4-final-hardening` build and suites were rerun. The dashboard E2E filter assertion was updated to target the rendered **Clear filters** button in commit `37b1312`; this is the only code fix after the 1:1 transfer. Both `server` and `client` production builds passed. The server suite passed 197 tests with its opt-in performance smoke intentionally skipped in that normal run; the client suite passed 107 tests; the complete Labs 3–4 E2E run passed 75/75; and the separate Lab 3 visual run passed 9/9. The opt-in performance smoke passed on 1,000 synthetic Tickets and 5,000 Actions with local p95 of 12 ms Requester and 36 ms Staff across 30 requests each. These are local feature-branch results, not final `main` results. PR #64 has an actual peer approval; PR #69 and the release PR #70 remain pending.
+
+Version history: 2026-10-31 — Issue #57 plan authored on `feature/57-lab4-engineering-contract-fake` before Lab 4 implementation; all statuses were Planned and independent review was pending. 2026-10-31 — Issue #61 dashboard evidence and executed row statuses added on `feature/61-lab4-role-dashboards-fake`. 2026-11-01 — Issue #62 local verification completed on `feature/62-lab4-final-hardening-fake`; no commit, PR, or independent review was created on that fake branch. 2026-11-01 — Real feature-branch builds and suites passed as recorded above; Issue #57 PR #64 was peer approved, while remaining release work is tracked in repository `todo.md`.

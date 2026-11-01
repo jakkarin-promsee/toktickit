@@ -1,6 +1,6 @@
 # Lab 4 Engineering Contract
 
-Status: Proposed for independent peer review; prepared on Issue #57 before Lab 4 production implementation. This contract extends the approved Lab 1–3 behavior in `../lab-03/specification.md`, `../lab-03/api-spec.md`, and `../lab-03/ui-spec.md`; only rules explicitly replaced here change.
+Status: Issue #57 contract, peer approved in [PR #64](https://github.com/jakkarin-promsee/toktickit/pull/64) and implemented and verified locally through Issue #62. Final staged integration and `main` verification are pending. This contract extends the approved Lab 1–3 behavior in `../lab-03/specification.md`, `../lab-03/api-spec.md`, and `../lab-03/ui-spec.md`; only rules explicitly replaced here change.
 
 ## 1. Sprint Goal
 
@@ -178,11 +178,11 @@ The normative API contract is [`api-spec.md`](./api-spec.md). New Action endpoin
 ## 10. Definition of Done
 
 - [ ] The four Issue #57 documents exist, agree on fields, IDs, roles, states, endpoints, and test mappings, and have an independent peer review with comments/responses recorded in the actual PR workflow.
-- [ ] Data migration and recovery rehearsal preserve Lab 1–3 data and verify zero-action legacy Tickets; seed is repeatable and contains the required demonstration cases.
-- [ ] Backend enforces every Action and Ticket write rule, ownership boundary, resolution gate, stale conflict, idempotency, safe error, audit event, and dashboard formula.
-- [ ] Desktop/tablet/mobile UI demonstrates all Part 5–9 rubric flows, including current-user Actions, Action assignment/edit/transition/complete/cancel, role visibility, blocked/successful resolution, drill-down, and zero/error states.
-- [ ] Planned unit, API/integration, UI/style, responsive, accessibility, security, workflow, migration, health, performance-smoke, E2E, and Labs 1–3 regression tests pass without skips; `tests.md` is updated with actual paths and results after execution.
-- [ ] Visual evidence and keyboard review cover every major Lab 4 screen; README setup/migration/seed/demo instructions are current; no temporary controls, broken links, console errors, or placeholder copy remain.
+- [x] Data migration and recovery rehearsal preserve Lab 1–3 data and verify zero-action legacy Tickets; seed is repeatable and contains the required demonstration cases.
+- [x] Backend enforces every Action and Ticket write rule, ownership boundary, resolution gate, stale conflict, idempotency, safe error, audit event, and dashboard formula.
+- [x] Desktop/tablet/mobile UI demonstrates all Part 5–9 rubric flows, including current-user Actions, Action assignment/edit/transition/complete/cancel, role visibility, blocked/successful resolution, drill-down, and zero/error states.
+- [x] Planned unit, API/integration, UI/style, responsive, accessibility, security, workflow, migration, health, performance-smoke, E2E, and Labs 1–3 regression tests pass locally; the opt-in performance smoke runs separately from the normal suite, and `tests.md` records actual paths and results.
+- [x] Visual evidence and keyboard review cover every major Lab 4 screen; README setup/migration/seed/demo instructions are current; no temporary controls, broken links, console errors, or placeholder copy remain in the checked local build.
 - [ ] Actual peer review and approved staged integration occur under the course workflow; no local fake-branch preparation is presented as a merged or approved real PR.
 
 ## 11. Assumptions and Decisions
@@ -193,7 +193,7 @@ The normative API contract is [`api-spec.md`](./api-spec.md). New Action endpoin
 - A new resolution requires a Completed Action, and after Reopened it requires completion after that reopen. This is the smallest auditable gate that proves actual work without inventing SLA, approval, or mandatory Requester sign-off.
 - UTC calendar-day windows make dashboard counts reproducible across browsers and time zones. Cards use a common server `asOf`, and filtered routes carry the same `from`/`through` values.
 - Administrator Action write rights are a deliberate Lab 4 exception to Lab 3 Ticket read-only behavior; all other Administrator Staff Ticket writes remain denied.
-- The four Issue #57 documents are prepared before Issues #58–#63 implementation. Their tests remain Planned until implementation executes them; actual peer review evidence and final Pass statuses cannot be claimed by this documentation branch.
+- The four Issue #57 documents were prepared before Issues #58–#63 implementation. The original Planned results were updated only after local execution. The Issue #57 contract received an actual peer approval in PR #64; final `main` execution remains a separate release check.
 
 ### Traceability sample
 
@@ -205,8 +205,11 @@ The normative API contract is [`api-spec.md`](./api-spec.md). New Action endpoin
 | --- | --- | --- |
 | 2026-10-31 | Issue #57 engineering contract and Test DD prepared on `feature/57-lab4-engineering-contract-fake` before Lab 4 implementation. | Independent peer review pending; no Lab 4 implementation test is claimed Pass. |
 | 2026-10-31 | Rechecked the contract against the handout, Lab 3 API and implementation, the UI contract, and AC-to-test mappings; clarified confirmed transitions, idempotent replay, event shapes, permissions, and test commands. | Existing Lab 1–3 Vitest suites passed locally; independent peer review and all Lab 4 implementation tests remain pending. |
+| 2026-11-01 | Recorded local Issue #62 implementation and test completion; checked the locally evidenced Definition of Done items. | PR #64 was peer approved and merged into `lab4-staging`; later PR discussions, full staged integration, and final `main` run remain pending. See `tests.md` and repository `todo.md`. |
 
 ### Independent reviewer checklist
+
+These prompts remain open until the reviewer records the specific checks and author responses in the real PR discussion; the approval summary alone does not prove each hands-on challenge was performed.
 
 - [ ] Challenge Action performer/assignee/completer semantics and each lifecycle transition, including direct completion and cancellation.
 - [ ] Try an Administrator Action write and an existing Staff Ticket write to verify the deliberate permission boundary.
