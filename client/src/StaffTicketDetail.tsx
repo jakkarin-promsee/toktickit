@@ -4,6 +4,7 @@ import {
   PublicComment, RequestedPriority, staffMutation, StaffTicketDetail as Detail,
 } from "./api.js";
 import { nextStatuses } from "./statusTransitions.js";
+import { ActionsTaken } from "./ActionsTaken.js";
 import { describedBy, ModalDialog, PRIORITY_LABELS, PriorityBadge, STATUS_LABELS, StatusBadge } from "./ui.js";
 
 const MAX_TEXT = 2000;
@@ -126,10 +127,10 @@ export function StaffTicketDetail({ ticketId, user, onBack, backLabel = "Back to
         <StatusBadge status={ticket.currentStatus} />
         <PriorityBadge kind="Requested" priority={ticket.requestedPriority} />
         <PriorityBadge kind="IT" priority={ticket.itPriority} />
-        {ticket.owner ? <span className="badge badge-owner">Owner: {ticket.owner.displayName}</span> : <span className="badge badge-owner-none">Unassigned</span>}
+        {ticket.owner ? <span className="badge badge-owner">Ticket Owner: {ticket.owner.displayName}</span> : <span className="badge badge-owner-none">Ticket Owner: Unassigned</span>}
       </p>
       <p className="small text-muted">Updated <time dateTime={ticket.updatedAt}>{formatTime(ticket.updatedAt)}</time></p>
-      {readOnly && <div className="alert alert-info" role="note">Read-only administrator view</div>}
+      {readOnly && <div className="alert alert-info" role="note">Ticket workflow is read-only for Administrators; Actions Taken may be managed here.</div>}
       {stale && <div className="alert alert-warning" role="alert">{STALE_MESSAGE} <button className="btn btn-sm btn-outline-secondary" onClick={load}>Refresh</button></div>}
 
       <div className="row g-3 mb-3">
@@ -203,6 +204,8 @@ export function StaffTicketDetail({ ticketId, user, onBack, backLabel = "Back to
           </div>
         )}
       </div>
+
+      <ActionsTaken ticketId={ticket.id} user={user} ticketVersion={ticket.version} ticketOwner={ticket.owner} ticketStatus={ticket.currentStatus} onWritten={(nextVersion) => { setTicket((current) => current ? { ...current, version: nextVersion } : current); void getStaffTicketDetail(ticket.id).then((fresh) => setTicket((current) => current ? { ...fresh, publicComments: current.publicComments, internalNotes: current.internalNotes } : current)).catch(() => undefined); }} />
 
       {confirmation && (
         <ModalDialog labelledBy="confirm-title" describedBy="confirm-body" onCancel={() => setConfirmation(null)}>

@@ -468,6 +468,19 @@ export function getAssignees(): Promise<PersonRef[]> {
   return authRequest<PersonRef[]>("/api/staff/assignees");
 }
 
+export type ActionStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+export interface ActionTaken {
+  id: string; ticketId: string; actionAt: string; description: string; result: string; status: ActionStatus;
+  performedBy: { id?: number; displayName: string }; assignee: { id?: number; displayName: string } | null;
+  followUpRequired: boolean; followUpNote: string | null; attachmentNotes: string | null;
+  createdAt: string; updatedAt: string; completedAt: string | null; cancelledAt: string | null;
+  version?: number; ticketVersion?: number; completedBy?: PersonRef | null; cancelledBy?: PersonRef | null; cancellationReason?: string | null;
+}
+export function listActions(ticketId: string): Promise<ActionTaken[]> { return authRequest<ActionTaken[]>(`/api/tickets/${ticketId}/actions`); }
+export function writeAction(ticketId: string, actionId: string | null, suffix: string, method: "POST" | "PATCH", body: Record<string, unknown>, csrfToken: string, idempotencyKey?: string): Promise<ActionTaken> {
+  return authRequest<ActionTaken>(`/api/tickets/${ticketId}/actions${actionId ? `/${actionId}${suffix}` : ""}`, { method, headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken, ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}) }, body: JSON.stringify(body) });
+}
+
 export function staffMutation(path: string, method: "POST" | "PATCH", body: Record<string, unknown>, csrfToken: string): Promise<StaffTicketDetail> {
   return authRequest<StaffTicketDetail>(`/api/staff/tickets/${path}`, { method, headers: { Origin: window.location.origin, "X-CSRF-Token": csrfToken }, body: JSON.stringify(body) });
 }

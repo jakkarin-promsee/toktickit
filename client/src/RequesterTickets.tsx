@@ -1,4 +1,5 @@
 import { FormEvent, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { ActionsTaken } from "./ActionsTaken.js";
 import {
   ApiError,
   attachmentDownloadUrl,
@@ -133,6 +134,8 @@ export function RequesterTicketDetail({ ticketId, user, onBack }: { ticketId: st
           <dt>Description</dt><dd className="comment-text">{ticket.description}</dd>
         </dl>
       </section>
+
+      <ActionsTaken ticketId={ticket.id} user={user} />
 
       <section className="card zen-card p-3 mb-3" aria-label="Attachments">
         <h2 className="h5">Attachments</h2>
