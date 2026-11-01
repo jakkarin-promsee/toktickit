@@ -1,6 +1,6 @@
 # Lab 4 REST API Specification
 
-Status: Issue #57 contract, implemented and verified locally through Issue #62. Final verification on `main` is pending. Base URL `/api`; JSON request/response except the inherited Attachment endpoints. `specification.md` is normative for business rules, and the approved `../lab-03/api-spec.md` remains normative for unchanged routes.
+Status: Issue #57 contract, peer reviewed and included in the Lab 4 release on `main` at `3d049a0`. The final `main` server, client, E2E, visual, and opt-in performance checks passed on isolated schemas on 1 November 2026; see `tests.md`. Base URL `/api`; JSON request/response except the inherited Attachment endpoints. `specification.md` is normative for business rules, and the approved `../lab-03/api-spec.md` remains normative for unchanged routes.
 
 ## 1. Shared security, framing, and error rules
 
