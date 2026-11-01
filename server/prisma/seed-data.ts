@@ -172,3 +172,12 @@ export const INTERNAL_NOTE_SEEDS = [
     content: "Battery diagnostics show reduced capacity; arrange a hardware inspection.",
   },
 ] as const;
+
+export const ACTION_SEEDS = [
+  { id: "34a00000-0000-4000-8000-000000000001", ticketNumber: "TKT-20261004-310002", performerEmail: "narin.staff@example.test", assigneeEmail: "narin.staff@example.test", description: "Inspect the affected access points", result: "Two rooms share the same access point", status: "COMPLETED", followUpRequired: false, followUpNote: null },
+  { id: "34a00000-0000-4000-8000-000000000002", ticketNumber: "TKT-20261004-310002", performerEmail: "kanda.staff@example.test", assigneeEmail: "thep.staff@example.test", description: "Check the wireless controller logs", result: "", status: "PLANNED", followUpRequired: true, followUpNote: "Review the logs after the next class" },
+  { id: "34a00000-0000-4000-8000-000000000003", ticketNumber: "TKT-20261004-310003", performerEmail: "kanda.staff@example.test", assigneeEmail: "kanda.staff@example.test", description: "Run battery diagnostics", result: "Capacity is below expected range", status: "IN_PROGRESS", followUpRequired: false, followUpNote: null },
+  { id: "34a00000-0000-4000-8000-000000000004", ticketNumber: "TKT-20261004-310004", performerEmail: "thep.staff@example.test", assigneeEmail: null, description: "Wait for browser retest", result: "", status: "PLANNED", followUpRequired: true, followUpNote: "Ask Requester to retry after clearing cache" },
+  { id: "34a00000-0000-4000-8000-000000000005", ticketNumber: "TKT-20261004-310005", performerEmail: "narin.staff@example.test", assigneeEmail: "narin.staff@example.test", description: "Refresh VPN client configuration", result: "Connection restored", status: "COMPLETED", followUpRequired: false, followUpNote: null },
+  { id: "34a00000-0000-4000-8000-000000000006", ticketNumber: "TKT-20261004-310007", performerEmail: "thep.staff@example.test", assigneeEmail: "thep.staff@example.test", description: "Review the previous validation warning", result: "Superseded by a new investigation", status: "CANCELLED", followUpRequired: false, followUpNote: null },
+] as const;
