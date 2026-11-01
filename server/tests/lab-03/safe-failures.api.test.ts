@@ -47,7 +47,10 @@ describe("FAIL-01 Issue #38 safe dependency failures", () => {
       ["GET /api/auth/me", () => request(app).get("/api/auth/me")],
       ["GET /api/tickets", () => request(app).get("/api/tickets")],
       ["GET /api/tickets/:id", () => request(app).get(`/api/tickets/${ticketId}`)],
+      ["GET /api/tickets/:id/actions", () => request(app).get(`/api/tickets/${ticketId}/actions`)],
       ["GET /api/tickets/:id/comments", () => request(app).get(`/api/tickets/${ticketId}/comments`)],
+      ["GET /api/dashboard/requester", () => request(app).get("/api/dashboard/requester")],
+      ["GET /api/dashboard/staff", () => request(app).get("/api/dashboard/staff")],
       ["GET /api/staff/tickets", () => request(app).get("/api/staff/tickets")],
       ["GET /api/staff/tickets/:id", () => request(app).get(`/api/staff/tickets/${ticketId}`)],
       ["GET /api/staff/tickets/:id/internal-notes", () => request(app).get(`/api/staff/tickets/${ticketId}/internal-notes`)],
@@ -63,5 +66,11 @@ describe("FAIL-01 Issue #38 safe dependency failures", () => {
     const response = await request(app).get("/api/categories");
     expect([500, 503]).toContain(response.status);
     for (const marker of leakMarkers) expect(response.text).not.toContain(marker);
+  });
+
+  it("keeps the exact public health response during a database outage", async () => {
+    const response = await request(app).get("/api/health");
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: "ok", service: "TokTickIT API" });
   });
 });
