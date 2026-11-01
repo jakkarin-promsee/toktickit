@@ -205,7 +205,7 @@ The normative API contract is [`api-spec.md`](./api-spec.md). New Action endpoin
 | --- | --- | --- |
 | 2026-10-31 | Issue #57 engineering contract and Test DD prepared on `feature/57-lab4-engineering-contract-fake` before Lab 4 implementation. | Independent peer review pending; no Lab 4 implementation test is claimed Pass. |
 | 2026-10-31 | Rechecked the contract against the handout, Lab 3 API and implementation, the UI contract, and AC-to-test mappings; clarified confirmed transitions, idempotent replay, event shapes, permissions, and test commands. | Existing Lab 1–3 Vitest suites passed locally; independent peer review and all Lab 4 implementation tests remain pending. |
-| 2026-11-01 | Recorded local Issue #62 implementation and test completion; checked the locally evidenced Definition of Done items. | PR #64 was peer approved and merged into `lab4-staging`; later PR discussions, full staged integration, and final `main` run remain pending. See `tests.md` and repository `todo.md`. |
+| 2026-11-01 | Recorded local Issue #62 implementation and test completion; checked the locally evidenced Definition of Done items. | PR #64 was peer approved and merged into `lab4-staging`; later PR discussions, full staged integration, and final `main` run remain pending. See `tests.md` and `reviewer.md` for later verified outcomes. |
 | 2026-11-01 | Closed the staged release through approved PR #70 and reran the full local gate at final `main` commit `3d049a0`. | Builds, server/client suites, E2E, visual, and separate performance smoke passed on isolated schemas. The first DoD item remains open only because posted author responses to PR comments have not been verified; see `reviewer.md`. |
 
 ### Independent reviewer checklist
