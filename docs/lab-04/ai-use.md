@@ -2,9 +2,14 @@
 
 ## Tool Used
 
-- **AI tools:** Claude (Desktop / CLI), Chat GPT/Codex (Desktop / web client), Cursor, and Gemini.
+- **AI tools:** Claude (Desktop / CLI), ChatGPT/Codex (Desktop / web client), and Cursor.
 - **Models:** Different models were selected depending on task complexity and availability. More capable reasoning models were used for requirement analysis, cross-file review, and complex debugging, while faster models were used for focused implementation questions and quick checks.
 - **Purpose:** Understanding requirements, planning implementation, drafting specifications, coding assistance, test design, debugging, documentation, and reviewing work before submission.
+
+- **Specific usage:**
+  - `Claude Opus 5` / `GPT-6 Sol` at medium to high reasoning effort: I used these models to analyze the lab PDF, plan issues and acceptance criteria, clarify requirements, and review code implemented with faster models.
+  - `Claude Sonnet 5` / `GPT-6 Terra`: I used these models to implement scoped issue work and make smaller iterative changes, then reviewed the result with the more capable models.
+  - `Cursor`: I used its IDE integration to share the relevant code context with the agent and inspect the interface directly using Cursor's built-in UI controls.
 
 ## Prompt History
 

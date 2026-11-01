@@ -1,5 +1,11 @@
 # Lab 4 visual evidence index
 
+## Final `main` release evidence
+
+The release merge is `3d049a0d9f8c212eb0eb3c2dd4a48b687f52b5bd` from approved PR #70. [Kanban before](release-evidence/kanban-before-backlog.png) and [Kanban after](release-evidence/kanban-after-done.png) are the owner's original GitHub Project captures, copied into the repository without altering the source files; the after image visibly places Issues #57–#63 in Done. The [merge-chain image](release-evidence/git-merge-graph-final-main.png) renders the local first-parent Git history for PRs #64–#70.
+
+The [server](release-evidence/server-tests-final-main.png), [client](release-evidence/client-tests-final-main.png), [E2E](release-evidence/e2e-tests-final-main.png), [visual](release-evidence/visual-tests-final-main.png), [performance](release-evidence/performance-smoke-final-main.png), and [build](release-evidence/builds-final-main.png) images are **rendered excerpts of captured terminal stdout**, labelled with the actual final-main commit and commands; they are not screenshots of an interactive terminal window. Full local logs are retained under ignored `plan/lab4-closeout-20261101/`, and the command/results summary is committed in `docs/lab-04/tests.md`. Normal server tests deliberately skip the separately executed opt-in performance smoke.
+
 The original Lab 4 matrix and workflow images were captured by Playwright against the isolated `lab3_e2e` schema and synthetic `example.test` accounts; run `npm run test:e2e:lab4` to regenerate those images from a fresh seed. The supplemental PDF-draft images below were captured separately against isolated `lab4_pdf_evidence_20261101` and `lab4_pdf_final_20261101` schemas on the current Lab 4 build. The final supplemental capture script is kept under ignored `plan/tmp/lab4-pdf/`; `test:e2e:lab4` does not regenerate the supplemental images. Images contain no credentials or session tokens. Full-page screenshots show the screen state; mobile dialogs scroll internally, so the separate mobile submit image shows the lower form controls.
 
 ## Supplemental PDF-draft images

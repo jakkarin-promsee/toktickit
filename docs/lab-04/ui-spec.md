@@ -1,6 +1,6 @@
 # Lab 4 Zen Green UI Specification
 
-Status: Issue #57 screen contract, implemented and verified locally through Issue #62. Final verification on `main` is pending. Extend the approved `../lab-03/ui-spec.md` design tokens, badges, cards, tables, form validation, shell, feedback, and responsive behavior. `specification.md` defines authorization and lifecycle rules; `api-spec.md` defines payloads and safe errors. All Action text is Requester-visible shared content and renders as escaped plain text.
+Status: Issue #57 screen contract, implemented and verified on `main` at `3d049a0` through the final client, E2E, and visual runs on 1 November 2026. The seven visual/accessibility checklist items below remain checked; the automated run used isolated test schemas and a 200% zoom-equivalent viewport. Extend the approved `../lab-03/ui-spec.md` design tokens, badges, cards, tables, form validation, shell, feedback, and responsive behavior. `specification.md` defines authorization and lifecycle rules; `api-spec.md` defines payloads and safe errors. All Action text is Requester-visible shared content and renders as escaped plain text.
 
 ## 1. Application shell and role navigation
 
