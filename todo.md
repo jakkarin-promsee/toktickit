@@ -1,55 +1,24 @@
-# Lab 4 release and documentation TODO
+# Lab 4 closeout TODO
 
-Snapshot: 1 November 2026, on `feature/62-lab4-final-hardening`. This is the handoff checklist for the remaining Lab 4 work. The local implementation through Issue #62, the four engineering contracts, AI-use record, reviewer record, and 87 demonstration PNGs are prepared. The real feature branch passed both builds, 197 server tests, 107 client tests, 75 E2E tests, 9 visual tests, and the separate performance smoke. Those results do **not** substitute for a final `main` run. Do not claim manual UAT passed: the 50-case log in `docs/lab-04/uat.md` is blank, and this release does not require a new manual UAT run.
+Snapshot: 1 November 2026. Sprint 4 is merged into `main` at `3d049a0d9f8c212eb0eb3c2dd4a48b687f52b5bd` through approved release PR #70. This document is the remaining-work handoff; do not repeat the earlier release audit unless code changes.
 
-## Finish the GitHub workflow
+## Completed and verified
 
-- [ ] Push the Issue #62 feature branch, open own PR **#69** if GitHub assigns that number, obtain actual independent peer review, respond to substantive comments, and merge it into `lab4-staging` under the agreed workflow. Issue #62 currently has the local E2E selector fix in commit `37b1312`.
-- [ ] Complete Issue #63 on the required `lab4-staging` release branch after #62 is reviewed and merged. Prepare the release PR from `lab4-staging` to `main` (**#70** only if GitHub assigns that number); obtain peer approval and let the user merge it. Record actual branch, PR, reviewer, merge, and commit links. Do not treat reserved numbers as existing PRs until verified. Route any release defect through a separate reviewed fix branch back into staging.
-- [ ] Complete the reciprocal review of the partner's PRs **#76–#77** when they exist. Record the actual author, Issue, branch, review links, verdict, responses, and merge status.
-- [ ] Move the Lab 4 issues to **Done** on the GitHub Project/Kanban board after completion; capture a readable final board link/screenshot. Confirm own Issues **#57–#63** and PRs **#64–#70** against GitHub rather than relying on planned numbering.
-- [ ] Capture the final `main` repository URL and commit/branch graph. Verify the delivered README, `.gitignore`, and directory tree at that commit; capture readable links or images for PDF Part 1.
+- [x] Own Issues #57–#63 are closed; feature PRs #64–#69 entered `lab4-staging` in order; release PR #70 merged to `main` with actual peer approval. Partner reviews #71–#76 have verified PR/review links in `docs/lab-04/reviewer.md`.
+- [x] The owner-supplied before/after GitHub Project images are copied byte-for-byte from Downloads into `artifacts/lab-04/release-evidence/kanban-before-backlog.png` and `kanban-after-done.png`. The after image shows all seven issues in Done. The Project URL is <https://github.com/users/jakkarin-promsee/projects/7/views/1>.
+- [x] Final `main` builds passed. Server tests: 197 passed and the separate opt-in performance test skipped by design; client: 107 passed; E2E: 75 passed; visual: 9 passed; separate dashboard performance smoke: 1 passed. Results and test-schema limits are recorded in `docs/lab-04/tests.md`. Readable images rendered from the captured terminal stdout and a Git merge-history image are in `artifacts/lab-04/release-evidence/` and indexed by `artifacts/lab-04/README.md`.
+- [x] `docs/lab-04/api-spec.md`, `specification.md`, `tests.md`, `ui-spec.md`, and `reviewer.md` reflect the final `main` state and distinguish verified evidence from pending GitHub activity. All seven UI specification checklist items are checked. `docs/lab-04/ai-use.md` is complete. The 50-case human UAT log remains accurately marked Not run; this closeout does not require a new manual UAT run.
+- [x] `plan/lab04-pdf-draft.md` contains the nine required parts and final-main links/results. A 14-page review PDF is at `plan/lab4-closeout-20261101/lab04-submission-preview.pdf` (ignored local working file). It is explicitly marked preview while the items below are outstanding.
 
-## Verify the final `main` state
+## Remaining actions for the owner and peer
 
-- [ ] Before the release PR merges, run the complete build/test/visual/performance checks on the final `lab4-staging` release candidate and record its SHA and output. Recheck migration/seed, dashboard metric comparisons, screenshots, and documented limitations. Refresh the release candidate if review changes anything.
-- [ ] At the exact final `main` commit, verify migration status, backed-up Lab 1–3 data preservation, seed repeatability, and the documented recovery path in `docs/lab-04/actions-migration.md`. Use an isolated scratch schema/database for destructive rehearsals; never reset a database containing real work.
-- [ ] Run and record the complete final `main` commands and outputs: `npm --prefix server run build`, `npm --prefix client run build`, `npm run test:server`, `npm run test:client`, `npm run test:e2e`, `npm run test:visual`, and the opt-in `LAB4_PERF_SMOKE=1` dashboard performance test from `server/`. The normal server run intentionally skips only that opt-in smoke, which must pass separately. Record commit SHA, date, schema/environment, counts, failures/skips, and actual timings. If a test fails, fix and rerun before calling the release complete.
-- [ ] Recheck the final `main` UI and selected evidence images against the delivered code: role dashboards, Action lifecycle, Ticket gate/history, Requester scope, Labs 1–3 regression, responsive matrix, keyboard/focus, console/link/placeholder sweep. The 87 PNGs are already available under `artifacts/lab-04/screenshots/`; recapture only if the final build differs. Clearly label synthetic data, intercepted `*-mocked.png` states, and the 200% **zoom-equivalent** viewport.
+- [ ] Complete the peer's PR #77 when it exists, obtain an actual independent review, and merge it under the agreed workflow. As of this snapshot, PR #77 was not found and the partner's Issue #69 was open. Update the #77 row in `docs/lab-04/reviewer.md` using the real PR, approval, discussion, and merge links. Do not infer approval from a prepared review file.
+- [ ] Post real author responses to substantive review comments on own PRs if the course's discussion requirement is being satisfied through GitHub. None were verified on PRs #64–#70 at this snapshot. Then add the exact comment/response/resolution links to `docs/lab-04/reviewer.md` and check the first Definition of Done item in `docs/lab-04/specification.md` only when the record actually supports it. Leave the five independent-review challenge prompts unchecked unless the reviewer performs and records those checks.
+- [ ] Capture one real IDE Explorer screenshot showing the final repository directory structure for PDF Part 1 if the instructor expects the assignment's literal “in your IDE” image. The repository tree link is already in the preview; it does not replace that specific screenshot. Place the image under `artifacts/lab-04/release-evidence/` and add it to the evidence index.
+- [ ] If the instructor requires literal terminal-window screenshots, capture server, client, and E2E result windows. The existing images are faithful **rendered excerpts of captured stdout**, not terminal-window captures; they already show the verified counts and should be sufficient if output evidence is accepted.
+- [ ] If demonstrating against the local `server/.env` `public` database, back up its existing data/attachments and apply the missing Lab 3 and Lab 4 migrations safely. The isolated `lab2_test` and `lab3_e2e` schemas used by the passing tests are already migrated. Do not reset `public` merely to complete the documentation.
 
-## Close document evidence gaps
+## Final submission after the external evidence exists
 
-- [ ] Update `docs/lab-04/reviewer.md` after both repositories reach `main`: fill actual details for own PRs #69–#70 and reviewed PRs #76–#77, refresh issue/merge status, and complete **Notable comments, responses, and resolutions** with direct links to posted comments, author replies, and the resulting decision or change. PR #64 already has an approval and four review comments, but no author replies were found when this checklist was prepared; add real responses if needed to satisfy the contract DoD. Do not invent discussion or approval.
-- [ ] Close the two remaining unchecked items in `docs/lab-04/specification.md` §10: (1) four-document agreement **plus** documented peer comments/responses, and (7) actual peer review and approved staged integration. Complete its five independent-review challenge prompts only when the reviewer records the specific checks and responses. The other five §10 items are checked from local evidence; revalidate them if final `main` changes code.
-- [ ] Add final `main` command/results evidence to `docs/lab-04/tests.md`; update its status/version history and any matrix row that changes. Keep fake-branch results, real feature-branch results, and final `main` results clearly distinguished. Keep the manual UAT log marked **Not run** unless a human actually executes cases.
-- [ ] Update the status lines of `docs/lab-04/api-spec.md` and `docs/lab-04/ui-spec.md` from “final `main` verification pending” after that verification. `api-spec.md` and `tests.md` have no checkbox lists; the seven UI checklist items in `ui-spec.md` are already checked, subject to final build recheck.
-- [ ] Check `docs/lab-04/ai-use.md` renders at its final `main` link. Its nine prompt selections and the author's reflection are complete; carry the prepared short reflection from the PDF draft into the final PDF.
-
-## Assemble the one final submission PDF
-
-Source outline: `plan/lab04-pdf-draft.md` (ignored by Git). It contains the drafted text, exact image choices, captions, and link placeholders. Make **one** concise, readable PDF with headings **Answer Part 1** through **Answer Part 9** in order; then verify every link, image, caption, and page at normal zoom. The 87 Lab 4 PNGs exist; the draft's image references resolved at the pre-release check. Do not shrink full-page images into unreadable thumbnails. Use final repository links or embed selected images.
-
-| PDF part | Remaining final evidence |
-| --- | --- |
-| 1 — Git Use | Final `main` repo and commit graph; Project Done board; rendered reviewer record and actual review/response/approval links; README, `.gitignore`, directory tree. |
-| 2 — Spec DD | Final `docs/lab-04/specification.md` link/rendered excerpt and verifiable Issue #57 contract-before-implementation commit/PR chronology. |
-| 3 — Test DD | Final `docs/lab-04/tests.md` link/rendered excerpt, traceability, and complete test/build output tied to final `main`; disclose unrun manual UAT. |
-| 4 — AI Use | Final `docs/lab-04/ai-use.md` link/rendered excerpt and the already drafted brief **My Reflection**. |
-| 5 — Staff Dashboard | Select the drafted populated, Admin, drill-down, count-comparison, zero/failure, and responsive images; pair them with final-build status. |
-| 6 — Actions Taken | Select the drafted list/create/assign/edit/transition/complete/cancel, Requester read-only, validation/failure, and responsive images. |
-| 7 — Ticket Workflow | Select the drafted gate, Requester advisory, history, stale-conflict, and role-visibility images. |
-| 8 — Requester Dashboard/Regression | Select the drafted owned dashboard/drill-down/empty/failure images and Labs 1–3 regression evidence. |
-| 9 — UI/Accessibility | Final `docs/lab-04/ui-spec.md` link/rendered checklist; readable 1440×900, 820×1180, 390×844 matrix; focus/validation and zoom-equivalent evidence; final console/link/polish results. |
-
-- [ ] Replace every remaining `<--- Need ... --->` placeholder in the PDF draft with verified final links or evidence; remove the working-draft banner in the submitted PDF.
-- [ ] Export the final PDF, inspect all nine parts and selected images at normal zoom, confirm links resolve to the final `main` state, and submit the PDF by the course workflow.
-
-## Already prepared; no repeat audit needed unless final code changes
-
-- `docs/lab-04/ai-use.md`: complete content.
-- `docs/lab-04/api-spec.md`: implemented contract; no checkboxes.
-- `docs/lab-04/specification.md`: five local-evidence DoD items checked; two release/review items and five reviewer prompts remain above.
-- `docs/lab-04/tests.md`: all executed matrix rows Pass; no checkboxes; local feature-branch evidence recorded separately from final `main`.
-- `docs/lab-04/ui-spec.md`: all seven UI checklist items checked.
-- `docs/lab-04/reviewer.md`: verified links for existing own PRs #64–#68 and partner PRs #71–#75; remaining records and discussion are listed above.
-- `plan/lab04-pdf-draft.md`: all nine parts drafted and image set selected; final links, results, reflection, and PDF layout remain above.
+- [ ] Refresh the PDF preview with actual PR #77 and author-response details; add the IDE image if captured. Check each of Answer Part 1–9, all links, image legibility, and captions at normal zoom. Remove the preview/pending banner only when the claims are true. Export the one final PDF and submit it using the course workflow.
+- [ ] Push the `docs/63-lab4-release-closeout` documentation branch, open its PR, obtain review, and merge only when the owner chooses. The agent must not push or merge. GitHub `main` links embedded in the docs/PDF will resolve to the new closeout assets after that merge.
