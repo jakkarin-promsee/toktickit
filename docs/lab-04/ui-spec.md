@@ -62,12 +62,12 @@ Evidence viewports are 1440×900, 820×1180, and 390×844, plus a 200% zoom chec
 
 ### Visual and accessibility evidence checklist
 
-- [ ] Requester Dashboard: four labelled cards, attention/recent lists, owned-only data, zero/loading/error states, exact drill-down, desktop/tablet/mobile screenshots.
-- [ ] Staff Dashboard: three cards, all status/priority buckets, recent/urgent/current-user Action lists, zero/loading/forbidden/error states, exact links, desktop/tablet/mobile screenshots.
-- [ ] Administrator Dashboard and Ticket Review: Staff-style metrics, read-only existing Ticket workflow, Action-only controls, role navigation and active-page indication.
-- [ ] Actions Taken: ordered list, empty, create, view/edit, assignment/reassignment, start, direct complete, cancel, follow-up conditional requirement, inactive assignee, Requester read-only, terminal read-only, and differing Ticket Owner/Performer.
-- [ ] Ticket workflow: all eight status labels, allowed/denied controls, Owner/Action gate guidance, Requester advisory signal, confirmation, successful refresh, stale conflict, and append-only history baseline.
-- [ ] Keyboard and accessibility: skip link, menu, card links, Action panels/dialogs, first-invalid focus, error announcements, focus return, noncolor status cues, 200% zoom, 44 px touch targets.
-- [ ] Responsive and polish: 1440×900, 820×1180, 390×844 screenshots under `artifacts/lab-04/screenshots/`, no clipping/overlap/page overflow, no placeholder text, console errors, broken links, or duplicate/obsolete UI.
+- [x] Requester Dashboard: four labelled cards, attention/recent lists, owned-only data, zero/loading/error states, exact drill-down, desktop/tablet/mobile screenshots.
+- [x] Staff Dashboard: three cards, all status/priority buckets, recent/urgent/current-user Action lists, zero/loading/forbidden/error states, exact links, desktop/tablet/mobile screenshots.
+- [x] Administrator Dashboard and Ticket Review: Staff-style metrics, read-only existing Ticket workflow, Action-only controls, role navigation and active-page indication.
+- [x] Actions Taken: ordered list, empty, create, view/edit, assignment/reassignment, start, direct complete, cancel, follow-up conditional requirement, inactive assignee, Requester read-only, terminal read-only, and differing Ticket Owner/Performer.
+- [x] Ticket workflow: all eight status labels, allowed/denied controls, Owner/Action gate guidance, Requester advisory signal, confirmation, successful refresh, stale conflict, and append-only history baseline.
+- [x] Keyboard and accessibility: skip link, menu, card links, Action panels/dialogs, first-invalid focus, error announcements, focus return, noncolor status cues, 200% zoom, 44 px touch targets.
+- [x] Responsive and polish: 1440×900, 820×1180, 390×844 screenshots under `artifacts/lab-04/screenshots/`, no clipping/overlap/page overflow, no placeholder text, console errors, broken links, or duplicate/obsolete UI.
 
-This checklist is planned evidence, not a claim that screenshots or walkthroughs already exist. Final visual evidence is produced in the later implementation/hardening issues and recorded in `tests.md` only after execution.
+Execution evidence and screenshot links are recorded in `tests.md` and `artifacts/lab-04/README.md`; the checklist describes the tested local build and does not replace independent review.
