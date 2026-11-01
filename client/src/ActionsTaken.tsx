@@ -6,7 +6,7 @@ type Draft = { actionAt: string; description: string; result: string; assigneeId
 const activeTickets = ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"];
 const stamp = (value: string) => new Date(value).toLocaleString();
 const localTime = (value: string) => { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
-const emptyDraft = (): Draft => ({ actionAt: localTime(new Date().toISOString()), description: "", result: "", assigneeId: "", followUpRequired: false, followUpNote: "", attachmentNotes: "" });
+const emptyDraft = (): Draft => ({ actionAt: localTime(new Date(Math.ceil(Date.now() / 60000) * 60000).toISOString()), description: "", result: "", assigneeId: "", followUpRequired: false, followUpNote: "", attachmentNotes: "" });
 const fromAction = (action: ActionTaken): Draft => ({ actionAt: localTime(action.actionAt), description: action.description, result: action.result, assigneeId: String(action.assignee?.id ?? ""), followUpRequired: action.followUpRequired, followUpNote: action.followUpNote ?? "", attachmentNotes: action.attachmentNotes ?? "" });
 const errorText = (error: ApiError) => error.status === 403 ? "You no longer have permission to change this action." : error.status === 404 ? "This action or Ticket is no longer available." : error.code === "INACTIVE_ASSIGNEE" ? "The selected assignee is inactive. Choose another person." : error.status === 409 ? `${error.message} Refresh to review the latest version before saving again.` : error.status >= 500 ? "The action could not be saved. Your entries are kept; please retry." : error.message;
 
@@ -32,6 +32,7 @@ export function ActionsTaken({ ticketId, user, ticketVersion, ticketOwner, ticke
   const form = useRef<HTMLFormElement>(null);
   const conflictAlert = useRef<HTMLDivElement>(null);
   const inFlight = useRef(false);
+  const deepLinkApplied = useRef(false);
   const key = useRef(crypto.randomUUID());
   const version = useRef(ticketVersion);
   const opener = useRef<HTMLElement | null>(null);
@@ -43,7 +44,8 @@ export function ActionsTaken({ ticketId, user, ticketVersion, ticketOwner, ticke
     catch (error) { const api = error as ApiError; setState(api.status === 403 ? "forbidden" : api.status === 404 ? "missing" : "failed"); setMessage(api.status >= 500 ? "Actions Taken could not be loaded. Please retry." : api.message); }
   }, [ticketId]);
   useEffect(() => { void refresh(); }, [refresh]);
-  useEffect(() => { if (state !== "ready") return; const id = window.location.hash.match(/^#action-([0-9a-f-]{36})$/i)?.[1]; if (!id || !actions.some((action) => action.id === id)) return; setSelectedId(id); window.requestAnimationFrame(() => document.getElementById(`action-${id}`)?.scrollIntoView({ block: "center" })); }, [state, actions]);
+  useEffect(() => { deepLinkApplied.current = false; }, [ticketId]);
+  useEffect(() => { if (state !== "ready" || deepLinkApplied.current) return; deepLinkApplied.current = true; const id = window.location.hash.match(/^#action-([0-9a-f-]{36})$/i)?.[1]; if (!id || !actions.some((action) => action.id === id)) return; setSelectedId(id); window.requestAnimationFrame(() => document.getElementById(`action-${id}`)?.scrollIntoView({ block: "center" })); }, [state, actions]);
   useEffect(() => { if (user.role === "IT_STAFF") getAssignees().then(setAssignees).catch(() => setMessage("Assignee choices could not be loaded. Refresh to retry.")); else if (user.role === "ADMINISTRATOR") listUsers("", "").then((users) => setAssignees(users.filter((person) => person.isActive && ["IT_STAFF", "ADMINISTRATOR"].includes(person.role)).map(({ id, displayName, role }) => ({ id, displayName, role })))).catch(() => setMessage("Assignee choices could not be loaded. Refresh to retry.")); }, [user.role]);
   useEffect(() => { if (ticketVersion !== undefined) version.current = ticketVersion; }, [ticketVersion]);
   useEffect(() => { if (conflict) conflictAlert.current?.focus(); }, [conflict, message]);
@@ -65,7 +67,8 @@ export function ActionsTaken({ ticketId, user, ticketVersion, ticketOwner, ticke
   function submit(event: FormEvent) {
     event.preventDefault(); if (busy || requester || conflict) return;
     const next = validation(); setErrors(next); if (Object.keys(next).length) { focusFirstInvalid(form.current); return; }
-    const fields = { actionAt: new Date(draft.actionAt).toISOString(), description: draft.description.trim(), result: draft.result.trim(), followUpRequired: draft.followUpRequired, followUpNote: draft.followUpRequired ? draft.followUpNote.trim() : null, attachmentNotes: draft.attachmentNotes.trim() || null };
+    const actionAt = mode === "edit" && selected && draft.actionAt === localTime(selected.actionAt) ? selected.actionAt : new Date(draft.actionAt).toISOString();
+    const fields = { actionAt, description: draft.description.trim(), result: draft.result.trim(), followUpRequired: draft.followUpRequired, followUpNote: draft.followUpRequired ? draft.followUpNote.trim() : null, attachmentNotes: draft.attachmentNotes.trim() || null };
     if (mode === "create") void runWrite(null, "", "POST", { ticketVersion: version.current, ...fields, assigneeId: draft.assigneeId ? Number(draft.assigneeId) : null }, "Action", true);
     else if (mode === "edit" && selected) void runWrite(selected, "", "PATCH", { ticketVersion: version.current, actionVersion: selected.version, ...fields }, "Action");
   }
