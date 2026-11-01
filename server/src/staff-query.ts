@@ -10,6 +10,9 @@ export type Priority = (typeof PRIORITIES)[number];
 export type TicketStatusValue = (typeof TICKET_STATUSES)[number];
 
 export interface StaffQuery {
+  view?: "unassigned" | "owned-by-me" | "my-active-actions" | "recent-updated" | "urgent";
+  from?: Date;
+  through?: Date;
   search: string;
   categoryId?: number;
   relatedSystemId?: number;
@@ -30,7 +33,7 @@ function oneOf<T extends string>(value: string | undefined, allowed: readonly T[
 }
 
 export function parseStaffQuery(input: Record<string, unknown>): StaffQuery {
-  const allowed = new Set(["search", "categoryId", "relatedSystemId", "status", "requestedPriority", "itPriority", "owner", "sortBy", "sortOrder", "page", "pageSize"]);
+  const allowed = new Set(["search", "categoryId", "relatedSystemId", "status", "requestedPriority", "itPriority", "owner", "sortBy", "sortOrder", "page", "pageSize", "view", "from", "through"]);
   for (const key of Object.keys(input)) {
     if (!allowed.has(key)) throw new Error(`Unknown query parameter ${key}.`);
   }
@@ -38,6 +41,14 @@ export function parseStaffQuery(input: Record<string, unknown>): StaffQuery {
   if (Array.from(search).length > 120) throw new Error("Invalid search.");
 
   const ownerRaw = singleValue(input.owner, "owner");
+  const view = singleValue(input.view, "view");
+  if (view !== undefined && !["unassigned", "owned-by-me", "my-active-actions", "recent-updated", "urgent"].includes(view)) throw new Error("Invalid view.");
+  const fromRaw = singleValue(input.from, "from");
+  const throughRaw = singleValue(input.through, "through");
+  if (view && (ownerRaw !== undefined || input.status !== undefined || input.requestedPriority !== undefined || input.itPriority !== undefined)) throw new Error("Incompatible view filters.");
+  if ((view === "recent-updated") !== Boolean(fromRaw && throughRaw) || (view !== "recent-updated" && (fromRaw !== undefined || throughRaw !== undefined))) throw new Error("Invalid date filters.");
+  const iso = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
+  if (fromRaw && throughRaw && (!iso.test(fromRaw) || !iso.test(throughRaw) || !Number.isFinite(Date.parse(fromRaw)) || !Number.isFinite(Date.parse(throughRaw)) || Date.parse(fromRaw) > Date.parse(throughRaw))) throw new Error("Invalid date filters.");
   const owner = ownerRaw === undefined ? undefined : ownerRaw === "me" || ownerRaw === "unassigned" ? ownerRaw : positiveInteger(ownerRaw, "owner");
 
   const rawPageSize = singleValue(input.pageSize, "pageSize");
@@ -45,6 +56,9 @@ export function parseStaffQuery(input: Record<string, unknown>): StaffQuery {
   if (!(STAFF_PAGE_SIZES as readonly number[]).includes(pageSize)) throw new Error("Invalid pageSize.");
 
   return {
+    view: view as StaffQuery["view"],
+    from: fromRaw ? new Date(fromRaw) : undefined,
+    through: throughRaw ? new Date(throughRaw) : undefined,
     search,
     categoryId: positiveInteger(singleValue(input.categoryId, "categoryId"), "categoryId"),
     relatedSystemId: positiveInteger(singleValue(input.relatedSystemId, "relatedSystemId"), "relatedSystemId"),

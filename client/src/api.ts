@@ -139,6 +139,9 @@ export async function downloadAttachment(
 }
 
 export interface TicketListQuery {
+  view?: "open" | "attention" | "recent-updated" | "recent-resolved";
+  from?: string;
+  through?: string;
   search?: string;
   categoryId?: number;
   relatedSystemId?: number;
@@ -401,6 +404,7 @@ export function fetchTicketDetail(ticketId: string): Promise<TicketDetail> {
 }
 
 export interface StaffQueueTicket {
+  matchingActionCount?: number;
   id: string;
   ticketNumber: string;
   summary: string;
@@ -428,6 +432,34 @@ export async function getStaffQueue(search: string): Promise<StaffQueueResponse>
   const payload = await response.json() as Partial<StaffQueueResponse> & { error?: { code?: string; message?: string } };
   if (!response.ok || !payload.data || !payload.pagination || !payload.counts) throw new ApiError(response.status, payload);
   return payload as StaffQueueResponse;
+}
+
+export interface DashboardTicket { id: string; ticketNumber: string; summary: string; currentStatus: TicketStatus; updatedAt: string; itPriority?: RequestedPriority }
+export interface RequesterDashboardData { asOf: string; windowStart: string; cards: { openTickets: number; waitingForYou: number; recentlyUpdated: number; recentlyResolved: number }; recentTickets: DashboardTicket[]; attentionTickets: DashboardTicket[] }
+export interface StaffDashboardData { asOf: string; windowStart: string; cards: { unassignedTickets: number; myTickets: number; myActiveActions: number }; byStatus: Record<TicketStatus, number>; byItPriority: Record<RequestedPriority, number>; recentTickets: DashboardTicket[]; urgentTickets: DashboardTicket[]; myActions: { id: string; ticketId: string; ticketNumber: string; description: string; status: string; actionAt: string }[] }
+function isCount(value: unknown): value is number { return Number.isSafeInteger(value) && (value as number) >= 0; }
+function isDashboardBase(value: unknown, cardKeys: string[]): value is Record<string, unknown> {
+  if (!value || typeof value !== "object") return false;
+  const data = value as Record<string, unknown>;
+  const cards = data.cards as Record<string, unknown> | undefined;
+  return typeof data.asOf === "string" && !Number.isNaN(Date.parse(data.asOf)) && typeof data.windowStart === "string" && !Number.isNaN(Date.parse(data.windowStart)) && Boolean(cards) && cardKeys.every((key) => isCount(cards?.[key]));
+}
+function isDashboardTickets(value: unknown): value is DashboardTicket[] {
+  return Array.isArray(value) && value.every((item) => item && typeof item.id === "string" && typeof item.ticketNumber === "string" && typeof item.summary === "string" && typeof item.currentStatus === "string" && typeof item.updatedAt === "string");
+}
+export async function getRequesterDashboard(): Promise<RequesterDashboardData> {
+  const data = await authRequest<unknown>("/api/dashboard/requester");
+  if (!isDashboardBase(data, ["openTickets", "waitingForYou", "recentlyUpdated", "recentlyResolved"]) || !isDashboardTickets(data.recentTickets) || !isDashboardTickets(data.attentionTickets)) throw new Error("Dashboard response is incomplete.");
+  return data as unknown as RequesterDashboardData;
+}
+export async function getStaffDashboard(): Promise<StaffDashboardData> {
+  const data = await authRequest<unknown>("/api/dashboard/staff");
+  if (!isDashboardBase(data, ["unassignedTickets", "myTickets", "myActiveActions"]) || !isDashboardTickets(data.recentTickets) || !isDashboardTickets(data.urgentTickets) || !Array.isArray(data.myActions) || !data.myActions.every((item: { id?: unknown; ticketId?: unknown; ticketNumber?: unknown; description?: unknown; status?: unknown; actionAt?: unknown }) => item && typeof item.id === "string" && typeof item.ticketId === "string" && typeof item.ticketNumber === "string" && typeof item.description === "string" && typeof item.status === "string" && typeof item.actionAt === "string")) throw new Error("Dashboard response is incomplete.");
+  for (const [bucket, keys] of [["byStatus", ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "RESOLVED", "CLOSED", "REOPENED", "CANCELLED"]], ["byItPriority", ["LOW", "MEDIUM", "HIGH"]]] as const) {
+    const counts = data[bucket] as Record<string, unknown> | undefined;
+    if (!counts || typeof counts !== "object" || !keys.every((key) => isCount(counts[key]))) throw new Error("Dashboard response is incomplete.");
+  }
+  return data as unknown as StaffDashboardData;
 }
 
 export interface PersonRef { id: number; displayName: string; role?: UserRole }

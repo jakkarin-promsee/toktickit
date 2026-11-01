@@ -981,6 +981,66 @@ app.post("/api/tickets/:ticketId/problem-appears-resolved", async (req: Request,
   }
 });
 
+const activeStatuses = ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] as const;
+const dashboardTicketSelect = { id: true, ticketNumber: true, summary: true, currentStatus: true, updatedAt: true } as const;
+function dashboardWindow() {
+  const asOf = new Date();
+  const windowStart = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate() - 6));
+  return { asOf, windowStart };
+}
+function dashboardQueryValid(req: Request, res: Response) {
+  if (Object.keys(req.query).length) { sendError(res, 400, "INVALID_QUERY", "Dashboard query parameters are not supported."); return false; }
+  return true;
+}
+
+app.get("/api/dashboard/requester", async (req: Request, res: Response) => {
+  const session = await requireRequester(req, res);
+  if (!session || !dashboardQueryValid(req, res)) return;
+  const { asOf, windowStart } = dashboardWindow();
+  const own = { submittedByUserId: session.user.id };
+  const updated = { gte: windowStart, lte: asOf };
+  try {
+    const data = await getPrisma().$transaction(async (tx) => {
+      const [openTickets, waitingForYou, recentlyUpdated, recentlyResolved, recentTickets, attentionTickets] = await Promise.all([
+        tx.ticket.count({ where: { ...own, currentStatus: { in: [...activeStatuses] } } }),
+        tx.ticket.count({ where: { ...own, currentStatus: "WAITING_FOR_REQUESTER" } }),
+        tx.ticket.count({ where: { ...own, updatedAt: updated } }),
+        tx.ticket.count({ where: { ...own, currentStatus: "RESOLVED", lastStatusChangedAt: updated } }),
+        tx.ticket.findMany({ where: { ...own, updatedAt: updated }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 5, select: dashboardTicketSelect }),
+        tx.ticket.findMany({ where: { ...own, currentStatus: "WAITING_FOR_REQUESTER" }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 5, select: dashboardTicketSelect }),
+      ]);
+      return { asOf, windowStart, cards: { openTickets, waitingForYou, recentlyUpdated, recentlyResolved }, recentTickets, attentionTickets };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+    res.json({ data });
+  } catch (error) { ticketFailure(res, error, "GET /api/dashboard/requester", "Dashboard could not be loaded. Please try again."); }
+});
+
+app.get("/api/dashboard/staff", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF", "ADMINISTRATOR"]);
+  if (!session || !dashboardQueryValid(req, res)) return;
+  const { asOf, windowStart } = dashboardWindow();
+  const updated = { gte: windowStart, lte: asOf };
+  const activeActions: Prisma.ActionTakenWhereInput = { assigneeId: session.user.id, status: { in: ["PLANNED", "IN_PROGRESS"] }, ticket: { currentStatus: { in: [...activeStatuses] } } };
+  try {
+    const data = await getPrisma().$transaction(async (tx) => {
+      const [unassignedTickets, myTickets, myActiveActions, statuses, priorities, recentTickets, urgentTickets, actions] = await Promise.all([
+        tx.ticket.count({ where: { ownerId: null, currentStatus: { in: [...activeStatuses] } } }),
+        tx.ticket.count({ where: { ownerId: session.user.id, currentStatus: { in: [...activeStatuses] } } }),
+        tx.actionTaken.count({ where: activeActions }),
+        tx.ticket.groupBy({ by: ["currentStatus"], _count: { _all: true } }),
+        tx.ticket.groupBy({ by: ["itPriority"], _count: { _all: true } }),
+        tx.ticket.findMany({ where: { updatedAt: updated }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 5, select: { ...dashboardTicketSelect, itPriority: true } }),
+        tx.ticket.findMany({ where: { itPriority: "HIGH", currentStatus: { in: [...activeStatuses] } }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 5, select: { ...dashboardTicketSelect, itPriority: true } }),
+        tx.actionTaken.findMany({ where: activeActions, orderBy: [{ actionAt: "asc" }, { id: "asc" }], take: 5, select: { id: true, ticketId: true, description: true, status: true, actionAt: true, ticket: { select: { ticketNumber: true } } } }),
+      ]);
+      const byStatus = Object.fromEntries(TICKET_STATUSES.map((status) => [status, statuses.find((row) => row.currentStatus === status)?._count._all ?? 0]));
+      const byItPriority = Object.fromEntries((["LOW", "MEDIUM", "HIGH"] as const).map((priority) => [priority, priorities.find((row) => row.itPriority === priority)?._count._all ?? 0]));
+      return { asOf, windowStart, cards: { unassignedTickets, myTickets, myActiveActions }, byStatus, byItPriority, recentTickets, urgentTickets, myActions: actions.map(({ ticket, ...action }) => ({ ...action, ticketNumber: ticket.ticketNumber })) };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+    res.json({ data });
+  } catch (error) { ticketFailure(res, error, "GET /api/dashboard/staff", "Dashboard could not be loaded. Please try again."); }
+});
+
 app.get("/api/tickets", async (req: Request, res: Response) => {
   const session = await requireRequester(req, res);
   if (!session) return;
@@ -1014,6 +1074,10 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
         ? { relatedSystemId: query.relatedSystemId }
         : {}),
       ...(query.status ? { currentStatus: query.status } : {}),
+      ...(query.view === "open" ? { currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
+      ...(query.view === "attention" ? { currentStatus: "WAITING_FOR_REQUESTER" } : {}),
+      ...(query.view === "recent-updated" ? { updatedAt: { gte: query.from, lte: query.through } } : {}),
+      ...(query.view === "recent-resolved" ? { currentStatus: "RESOLVED", lastStatusChangedAt: { gte: query.from, lte: query.through } } : {}),
       ...(query.requestedPriority
         ? { requestedPriority: query.requestedPriority }
         : {}),
@@ -1111,6 +1175,11 @@ app.get("/api/staff/tickets", async (req: Request, res: Response) => {
       ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
       ...(query.itPriority ? { itPriority: query.itPriority } : {}),
       ...ownerFilter,
+      ...(query.view === "unassigned" ? { ownerId: null, currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
+      ...(query.view === "owned-by-me" ? { ownerId: session.user.id, currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
+      ...(query.view === "my-active-actions" ? { actions: { some: { assigneeId: session.user.id, status: { in: ["PLANNED", "IN_PROGRESS"] } } }, currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
+      ...(query.view === "recent-updated" ? { updatedAt: { gte: query.from, lte: query.through } } : {}),
+      ...(query.view === "urgent" ? { itPriority: "HIGH", currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
     };
     const sortField = query.sortBy === "status" ? "currentStatus" : query.sortBy;
     const orderBy: Prisma.TicketOrderByWithRelationInput[] = [{ [sortField]: query.sortOrder }, { id: query.sortOrder }];
@@ -1129,6 +1198,7 @@ app.get("/api/staff/tickets", async (req: Request, res: Response) => {
           requestedPriority: true, itPriority: true, currentStatus: true,
           owner: { select: { id: true, displayName: true, role: true } },
           requesterResolvedAt: true, createdAt: true, updatedAt: true, version: true,
+          ...(query.view === "my-active-actions" ? { actions: { where: { assigneeId: session.user.id, status: { in: ["PLANNED", "IN_PROGRESS"] } }, select: { id: true } } } : {}),
         },
       }),
       prisma.ticket.count(),
@@ -1137,7 +1207,7 @@ app.get("/api/staff/tickets", async (req: Request, res: Response) => {
     ]);
     const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize);
     res.status(200).json({
-      data: tickets.map(({ submittedBy, ...ticket }) => ({ ...ticket, requester: submittedBy })),
+      data: tickets.map(({ submittedBy, ...ticket }) => ({ ...ticket, requester: submittedBy, ...(query.view === "my-active-actions" && "actions" in ticket ? { matchingActionCount: (ticket.actions as { id: string }[]).length, actions: undefined } : {}) })),
       pagination: {
         page: query.page, pageSize: query.pageSize, totalItems, totalPages,
         hasPreviousPage: query.page > 1, hasNextPage: query.page < totalPages,
