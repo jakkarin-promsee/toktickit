@@ -82,7 +82,7 @@ test.describe("Lab 4 role dashboards", () => {
       await page.getByRole("link", { name: "View open tickets" }).click();
       await expect(page).toHaveURL(/\/tickets\?view=open$/);
       await expect(page.getByText("Filter: open")).toBeVisible();
-      await page.getByRole("link", { name: "Clear filters" }).click();
+      await page.getByRole("button", { name: "Clear filters" }).click();
       await expect(page).toHaveURL(/\/tickets$/);
       await expect(page.getByText("Filter: open")).toHaveCount(0);
       const crossOwner = await page.request.get(`${apiUrl}/api/tickets/${tickets.maliOpen.id}`);
