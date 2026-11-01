@@ -1,6 +1,6 @@
 # Lab 4 Engineering Contract
 
-Status: Issue #57 contract, peer approved in [PR #64](https://github.com/jakkarin-promsee/toktickit/pull/64) and implemented and verified locally through Issue #62. Final staged integration and `main` verification are pending. This contract extends the approved Lab 1–3 behavior in `../lab-03/specification.md`, `../lab-03/api-spec.md`, and `../lab-03/ui-spec.md`; only rules explicitly replaced here change.
+Status: Issue #57 contract, peer approved in [PR #64](https://github.com/jakkarin-promsee/toktickit/pull/64), integrated through the reviewed [release PR #70](https://github.com/jakkarin-promsee/toktickit/pull/70), and verified on final `main` commit `3d049a0` on 1 November 2026. Posted author responses to the review comments remain unverified. This contract extends the approved Lab 1–3 behavior in `../lab-03/specification.md`, `../lab-03/api-spec.md`, and `../lab-03/ui-spec.md`; only rules explicitly replaced here change.
 
 ## 1. Sprint Goal
 
@@ -183,7 +183,7 @@ The normative API contract is [`api-spec.md`](./api-spec.md). New Action endpoin
 - [x] Desktop/tablet/mobile UI demonstrates all Part 5–9 rubric flows, including current-user Actions, Action assignment/edit/transition/complete/cancel, role visibility, blocked/successful resolution, drill-down, and zero/error states.
 - [x] Planned unit, API/integration, UI/style, responsive, accessibility, security, workflow, migration, health, performance-smoke, E2E, and Labs 1–3 regression tests pass locally; the opt-in performance smoke runs separately from the normal suite, and `tests.md` records actual paths and results.
 - [x] Visual evidence and keyboard review cover every major Lab 4 screen; README setup/migration/seed/demo instructions are current; no temporary controls, broken links, console errors, or placeholder copy remain in the checked local build.
-- [ ] Actual peer review and approved staged integration occur under the course workflow; no local fake-branch preparation is presented as a merged or approved real PR.
+- [x] Actual peer review and approved staged integration occurred through PRs #64–#69 into `lab4-staging` and PR #70 into `main`; no local fake-branch preparation is presented as a merged or approved real PR.
 
 ## 11. Assumptions and Decisions
 
@@ -193,7 +193,7 @@ The normative API contract is [`api-spec.md`](./api-spec.md). New Action endpoin
 - A new resolution requires a Completed Action, and after Reopened it requires completion after that reopen. This is the smallest auditable gate that proves actual work without inventing SLA, approval, or mandatory Requester sign-off.
 - UTC calendar-day windows make dashboard counts reproducible across browsers and time zones. Cards use a common server `asOf`, and filtered routes carry the same `from`/`through` values.
 - Administrator Action write rights are a deliberate Lab 4 exception to Lab 3 Ticket read-only behavior; all other Administrator Staff Ticket writes remain denied.
-- The four Issue #57 documents were prepared before Issues #58–#63 implementation. The original Planned results were updated only after local execution. The Issue #57 contract received an actual peer approval in PR #64; final `main` execution remains a separate release check.
+- The four Issue #57 documents were prepared before Issues #58–#63 implementation. The original Planned results were updated only after local execution. The Issue #57 contract received an actual peer approval in PR #64; final `main` execution is recorded separately in `tests.md`.
 
 ### Traceability sample
 
@@ -206,6 +206,7 @@ The normative API contract is [`api-spec.md`](./api-spec.md). New Action endpoin
 | 2026-10-31 | Issue #57 engineering contract and Test DD prepared on `feature/57-lab4-engineering-contract-fake` before Lab 4 implementation. | Independent peer review pending; no Lab 4 implementation test is claimed Pass. |
 | 2026-10-31 | Rechecked the contract against the handout, Lab 3 API and implementation, the UI contract, and AC-to-test mappings; clarified confirmed transitions, idempotent replay, event shapes, permissions, and test commands. | Existing Lab 1–3 Vitest suites passed locally; independent peer review and all Lab 4 implementation tests remain pending. |
 | 2026-11-01 | Recorded local Issue #62 implementation and test completion; checked the locally evidenced Definition of Done items. | PR #64 was peer approved and merged into `lab4-staging`; later PR discussions, full staged integration, and final `main` run remain pending. See `tests.md` and repository `todo.md`. |
+| 2026-11-01 | Closed the staged release through approved PR #70 and reran the full local gate at final `main` commit `3d049a0`. | Builds, server/client suites, E2E, visual, and separate performance smoke passed on isolated schemas. The first DoD item remains open only because posted author responses to PR comments have not been verified; see `reviewer.md`. |
 
 ### Independent reviewer checklist
 
