@@ -2,6 +2,7 @@ import { FormEvent, KeyboardEvent, MouseEvent, useEffect, useRef, useState } fro
 import { UserManagement } from "./UserManagement.js";
 import { StaffTicketDetail } from "./StaffTicketDetail.js";
 import { StaffTicketQueue } from "./StaffTicketQueue.js";
+import { RequesterDashboard, StaffDashboard } from "./Dashboards.js";
 import { CreateTicket, MyTickets, RequesterTicketDetail } from "./RequesterTickets.js";
 import { ApiError, changePassword, CurrentUser, getCurrentUser, login, logout } from "./api.js";
 import { describedBy, focusFirstInvalid, RoleBadge } from "./ui.js";
@@ -105,17 +106,19 @@ function PasswordField({ id, label, autoComplete, hintId, value, onChange, error
 interface Destination { path: string; label: string }
 
 function destinationsFor(role: CurrentUser["role"]): Destination[] {
-  if (role === "REQUESTER") return [{ path: "/tickets", label: "My Tickets" }, { path: "/tickets/new", label: "Create Ticket" }];
-  if (role === "IT_STAFF") return [{ path: "/staff/tickets", label: "Ticket Queue" }];
-  return [{ path: "/admin/users", label: "Users" }, { path: "/staff/tickets", label: "Ticket Review" }];
+  if (role === "REQUESTER") return [{ path: "/dashboard", label: "Dashboard" }, { path: "/tickets/new", label: "Create Ticket" }, { path: "/tickets", label: "My Tickets" }];
+  if (role === "IT_STAFF") return [{ path: "/dashboard", label: "Dashboard" }, { path: "/staff/tickets", label: "Ticket Queue" }];
+  return [{ path: "/dashboard", label: "Dashboard" }, { path: "/staff/tickets", label: "Ticket Review" }, { path: "/admin/users", label: "Users" }];
 }
 
 function Shell({ user, notice, onChangePassword, onLoggedOut }: { user: CurrentUser; notice: string; onChangePassword: () => void; onLoggedOut: () => void }) {
   const [busy, setBusy] = useState(false); const [failure, setFailure] = useState(""); const [path, setPath] = useState(() => window.location.pathname); const [menuOpen, setMenuOpen] = useState(false);
+  const [, setRouteVersion] = useState(0);
   const menuToggle = useRef<HTMLButtonElement>(null);
   const destinations = destinationsFor(user.role);
   const home = destinations[0];
-  const current = path === "/" ? home.path : path;
+  const legacyHome = user.role === "REQUESTER" ? "/tickets" : user.role === "IT_STAFF" ? "/staff/tickets" : "/admin/users";
+  const current = path === "/" ? legacyHome : path;
   const canReviewTickets = user.role === "IT_STAFF" || user.role === "ADMINISTRATOR";
   const requesterTicketId = user.role === "REQUESTER" ? /^\/tickets\/([0-9a-f-]{36})$/i.exec(path)?.[1] : undefined;
   const staffDetailId = canReviewTickets ? /^\/staff\/tickets\/([0-9a-f-]{36})$/i.exec(path)?.[1] : undefined;
@@ -124,16 +127,17 @@ function Shell({ user, notice, onChangePassword, onLoggedOut }: { user: CurrentU
   const activePath = requesterTicketId ? "/tickets" : staffDetailId ? "/staff/tickets" : current;
   const queueLabel = user.role === "ADMINISTRATOR" ? "Ticket Review" : "Ticket Queue";
 
-  useEffect(() => { const onPopState = () => setPath(window.location.pathname); window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
-  function navigate(event: MouseEvent<HTMLAnchorElement>, nextPath: string) { event.preventDefault(); window.history.pushState({}, "", nextPath); setPath(nextPath); setMenuOpen(false); }
+  useEffect(() => { const onPopState = () => { setPath(window.location.pathname); setRouteVersion((version) => version + 1); }; window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
+  function navigate(event: MouseEvent<HTMLAnchorElement>, nextPath: string) { event.preventDefault(); window.history.pushState({}, "", nextPath); setPath(new URL(nextPath, window.location.origin).pathname); setRouteVersion((version) => version + 1); setMenuOpen(false); }
   async function signOut() { setBusy(true); setFailure(""); try { await logout(user.csrfToken); onLoggedOut(); } catch { setFailure("We could not sign you out. Try again."); setBusy(false); } }
   function onHeaderKeyDown(event: KeyboardEvent<HTMLElement>) { if (event.key === "Escape" && menuOpen) { setMenuOpen(false); menuToggle.current?.focus(); } }
 
   let content;
-  if (forbidden) content = <><h1>Access restricted</h1><p role="alert">You do not have access to this destination.</p><a href={home.path} onClick={(event) => navigate(event, home.path)}>Go to {home.label}</a></>;
-  else if (user.role === "REQUESTER") content = path === "/tickets/new" ? <CreateTicket user={user} onCreated={(id) => { window.history.pushState({}, "", `/tickets/${id}`); setPath(`/tickets/${id}`); }} /> : requesterTicketId ? <RequesterTicketDetail key={requesterTicketId} ticketId={requesterTicketId} user={user} onBack={(event) => navigate(event, "/tickets")} /> : <MyTickets onOpen={(event, id) => navigate(event, `/tickets/${id}`)} />;
+  if (forbidden) content = <><h1>Access restricted</h1><p role="alert">You do not have access to this destination.</p><a href={legacyHome} onClick={(event) => navigate(event, legacyHome)}>Go to {destinations.find((destination) => destination.path === legacyHome)?.label}</a></>;
+  else if (current === "/dashboard") content = user.role === "REQUESTER" ? <RequesterDashboard onOpen={navigate} /> : <StaffDashboard onOpen={navigate} />;
+  else if (user.role === "REQUESTER") content = path === "/tickets/new" ? <CreateTicket user={user} onCreated={(id) => { window.history.pushState({}, "", `/tickets/${id}`); setPath(`/tickets/${id}`); }} /> : requesterTicketId ? <RequesterTicketDetail key={requesterTicketId} ticketId={requesterTicketId} user={user} onBack={(event) => navigate(event, "/tickets")} /> : <MyTickets key={window.location.search} onOpen={(event, id) => navigate(event, `/tickets/${id}`)} />;
   else if (staffDetailId) content = <StaffTicketDetail key={staffDetailId} ticketId={staffDetailId} user={user} backLabel={`Back to ${queueLabel}`} onBack={(event) => navigate(event, "/staff/tickets")} />;
-  else if (current === "/staff/tickets") content = <StaffTicketQueue readOnly={user.role === "ADMINISTRATOR"} onOpen={(event, id) => navigate(event, `/staff/tickets/${id}`)} />;
+  else if (current === "/staff/tickets") content = <StaffTicketQueue key={window.location.search} readOnly={user.role === "ADMINISTRATOR"} onOpen={(event, id) => navigate(event, `/staff/tickets/${id}`)} />;
   else content = <UserManagement user={user} />;
 
   return (

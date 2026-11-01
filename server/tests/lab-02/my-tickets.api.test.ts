@@ -13,7 +13,7 @@ async function createTicket(email: string, summary: string) {
   return { agent, ticket: response.body.data };
 }
 
-afterEach(async () => { if (createdTicketIds.length) { await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } }); createdTicketIds.length = 0; } });
+afterEach(async () => { if (createdTicketIds.length) { await prisma.ticketWorkflowEvent.deleteMany({ where: { ticketId: { in: createdTicketIds } } }); await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } }); createdTicketIds.length = 0; } });
 afterAll(async () => { await prisma.$disconnect(); });
 
 describe("Issue #14 authenticated My Tickets API", () => {

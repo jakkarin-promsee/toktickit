@@ -4,11 +4,12 @@ import { PRIORITY_LABELS, PriorityBadge, STATUS_LABELS, StatusBadge } from "./ui
 const SORT_LABELS: Record<string, string> = { updatedAt: "Last updated", createdAt: "Created date", ticketNumber: "Ticket number", requestedPriority: "Requested priority", itPriority: "IT priority", status: "Status" };
 
 export interface QueueState {
+  view: string; from: string; through: string;
   search: string; categoryId: string; relatedSystemId: string; status: string; requestedPriority: string; itPriority: string; owner: string;
   sortBy: string; sortOrder: string; page: string; pageSize: string;
 }
 
-const DEFAULTS: QueueState = { search: "", categoryId: "", relatedSystemId: "", status: "", requestedPriority: "", itPriority: "", owner: "", sortBy: "updatedAt", sortOrder: "desc", page: "1", pageSize: "20" };
+const DEFAULTS: QueueState = { view: "", from: "", through: "", search: "", categoryId: "", relatedSystemId: "", status: "", requestedPriority: "", itPriority: "", owner: "", sortBy: "updatedAt", sortOrder: "desc", page: "1", pageSize: "20" };
 const KEYS = Object.keys(DEFAULTS) as (keyof QueueState)[];
 
 export function parseQueueSearch(search: string): { state: QueueState; reset: boolean } {
@@ -22,6 +23,9 @@ export function parseQueueSearch(search: string): { state: QueueState; reset: bo
     state[key] = values[0];
   };
   const positive = (value: string) => /^[1-9]\d*$/.test(value);
+  oneOf("view", (value) => ["unassigned", "owned-by-me", "my-active-actions", "recent-updated", "urgent"].includes(value));
+  oneOf("from", (value) => !Number.isNaN(Date.parse(value)));
+  oneOf("through", (value) => !Number.isNaN(Date.parse(value)));
   oneOf("search", (value) => Array.from(value).length <= 120);
   oneOf("categoryId", positive);
   oneOf("relatedSystemId", positive);
@@ -34,6 +38,9 @@ export function parseQueueSearch(search: string): { state: QueueState; reset: bo
   oneOf("page", positive);
   oneOf("pageSize", (value) => ["10", "20", "50"].includes(value));
   for (const key of params.keys()) if (!(KEYS as string[]).includes(key)) reset = true;
+  if (state.view && (state.owner || state.status || state.requestedPriority || state.itPriority)) reset = true;
+  if ((state.view === "recent-updated") !== Boolean(state.from && state.through)) reset = true;
+  if (state.view !== "recent-updated" && (state.from || state.through)) reset = true;
   return reset ? { state: { ...DEFAULTS }, reset } : { state, reset };
 }
 
@@ -45,7 +52,7 @@ function toSearch(state: QueueState): string {
 }
 
 function activeFilterCount(state: QueueState) {
-  return (["search", "categoryId", "relatedSystemId", "status", "requestedPriority", "itPriority", "owner"] as const).filter((key) => state[key] !== "").length;
+  return (["view", "search", "categoryId", "relatedSystemId", "status", "requestedPriority", "itPriority", "owner"] as const).filter((key) => state[key] !== "").length;
 }
 
 function OwnerText({ ticket }: { ticket: StaffQueueTicket }) {
@@ -93,6 +100,7 @@ export function StaffTicketQueue({ onOpen, readOnly = false }: { onOpen: (event:
   const key = toSearch(query);
   useEffect(() => {
     let live = true;
+    setResult(null);
     setStatus("loading");
     getStaffQueue(key)
       .then((data) => { if (live) { setResult(data); setStatus("ready"); } })
@@ -104,6 +112,7 @@ export function StaffTicketQueue({ onOpen, readOnly = false }: { onOpen: (event:
     setNotice("");
     setQuery((current) => {
       const next = { ...current, ...partial };
+      if (current.view && Object.keys(partial).some((key) => ["owner", "status", "requestedPriority", "itPriority"].includes(key))) { next.view = ""; next.from = ""; next.through = ""; }
       if (!("page" in partial)) next.page = "1";
       window.history.replaceState({}, "", `${window.location.pathname}${toSearch(next)}`);
       return next;
@@ -132,6 +141,7 @@ export function StaffTicketQueue({ onOpen, readOnly = false }: { onOpen: (event:
   return (
     <section aria-labelledby="queue-heading" aria-busy={loading}>
       <h1 id="queue-heading">{title}</h1>
+      {query.view && <p>Filter: {query.view.replaceAll("-", " ")} <button type="button" className="btn btn-sm btn-link" onClick={() => update({ view: "", from: "", through: "" })}>Clear filters</button></p>}
       {readOnly && <div className="alert alert-info" role="note">Read-only administrator view. Ticket operations belong to IT Staff.</div>}
       <div className="row g-2 mb-3" aria-label="Queue summary">
         {([["Total tickets", result?.counts.total], ["Unassigned", result?.counts.unassigned], ["Mine", result?.counts.mine]] as const).map(([label, value]) => (
@@ -171,6 +181,7 @@ export function StaffTicketQueue({ onOpen, readOnly = false }: { onOpen: (event:
       {status === "ready" && result && result.data.length > 0 && (
         <>
           <p aria-live="polite">Showing {start}–{end} of {pagination!.totalItems}</p>
+          {query.view === "my-active-actions" && <p className="small text-muted">Each Ticket appears once. The dashboard card counts Actions; matching Actions per Ticket are shown below.</p>}
           <div className="d-none d-md-block queue-table">
             <table className="table zen-table align-middle">
               <caption className="visually-hidden">Ticket queue</caption>
@@ -187,7 +198,7 @@ export function StaffTicketQueue({ onOpen, readOnly = false }: { onOpen: (event:
                 {result.data.map((ticket) => (
                   <tr key={ticket.id}>
                     <td>{ticket.ticketNumber}</td>
-                    <td className="queue-summary">{ticket.summary}<div className="small text-muted">{ticket.requester.displayName}</div></td>
+                    <td className="queue-summary">{ticket.summary}<div className="small text-muted">{ticket.requester.displayName}</div>{ticket.matchingActionCount !== undefined && <div className="small">{ticket.matchingActionCount} matching Action(s)</div>}</td>
                     <td><Badges ticket={ticket} /></td>
                     <td><StatusBadge status={ticket.currentStatus} /></td>
                     <td><OwnerText ticket={ticket} /></td>
@@ -203,6 +214,7 @@ export function StaffTicketQueue({ onOpen, readOnly = false }: { onOpen: (event:
               <li key={ticket.id} className="card zen-card p-3 mb-2 queue-card">
                 <strong>{ticket.ticketNumber}</strong>
                 <div className="queue-summary">{ticket.summary}</div>
+                {ticket.matchingActionCount !== undefined && <div className="small">{ticket.matchingActionCount} matching Action(s)</div>}
                 <div className="small text-muted">Requester: {ticket.requester.displayName}</div>
                 <div className="my-1"><Badges ticket={ticket} /></div>
                 <div className="my-1">Status: <StatusBadge status={ticket.currentStatus} /></div>

@@ -157,8 +157,9 @@ for (const viewport of allSizes) {
       await expect(page.getByText(/Read-only administrator view/)).toBeVisible();
       await check(page, viewport, "admin ticket review");
       await page.goto(`/staff/tickets/${tickets.maliOpen.id}`);
-      await expect(page.getByText("Read-only administrator view")).toBeVisible();
+      await expect(page.getByText(/Ticket workflow is read-only for Administrators/)).toBeVisible();
       await expect(page.getByRole("button", { name: /Claim|Reassign|Save IT Priority|Move to/ })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Add action" })).toBeVisible();
       await check(page, viewport, "admin ticket detail");
       await logout(page);
     });

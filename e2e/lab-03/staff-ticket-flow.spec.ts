@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 import { accounts, apiSession, apiUrl, csrfHeaders, signInReady, tickets, unique } from "./helpers";
 
 // 1×1 transparent PNG, valid signature for the Attachment validator.
@@ -115,6 +116,19 @@ test.describe("E2E-03 IT Staff Ticket Detail operations", () => {
     await expect(page.getByText("Status changed to Open.")).toBeVisible();
     await page.getByRole("button", { name: "Move to In Progress" }).click();
     await expect(page.getByText("Status changed to In Progress.")).toBeVisible();
+    // Lab 4 requires a completed Action in this Ticket's current cycle before formal resolution.
+    const detailResponse = await page.request.get(`${apiUrl}/api/staff/tickets/${ticket.id}`);
+    expect(detailResponse.status()).toBe(200);
+    const detail = (await detailResponse.json()).data as { version: number };
+    const assigneeResponse = await page.request.get(`${apiUrl}/api/staff/assignees`);
+    expect(assigneeResponse.status()).toBe(200);
+    const narinId = ((await assigneeResponse.json()).data as Array<{ id: number; displayName: string }>).find((person) => person.displayName === accounts.narin.name)!.id;
+    const actionResponse = await page.request.post(`${apiUrl}/api/tickets/${ticket.id}/actions`, { headers: { ...await csrfHeaders(page), "Idempotency-Key": randomUUID() }, data: { ticketVersion: detail.version, actionAt: new Date().toISOString(), description: "Verify mailbox repair", result: "Access restored", assigneeId: narinId, followUpRequired: false, followUpNote: null, attachmentNotes: null } });
+    expect(actionResponse.status(), await actionResponse.text()).toBe(201);
+    const action = (await actionResponse.json()).data as { id: string; version: number; ticketVersion: number };
+    const completed = await page.request.patch(`${apiUrl}/api/tickets/${ticket.id}/actions/${action.id}/status`, { headers: await csrfHeaders(page), data: { ticketVersion: action.ticketVersion, actionVersion: action.version, status: "COMPLETED" } });
+    expect(completed.status(), await completed.text()).toBe(200);
+    await page.reload();
     await page.getByRole("button", { name: "Move to Resolved" }).click();
     const resolve = page.getByRole("dialog");
     await expect(resolve.getByText(/from In Progress to Resolved/)).toBeVisible();

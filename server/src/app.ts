@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import { Prisma } from "@prisma/client";
 import crypto from "node:crypto";
@@ -27,6 +27,7 @@ import {
 import { parseTicketQuery } from "./ticket-query.js";
 import { parseStaffQuery, StaffQuery, TICKET_STATUSES, TicketStatusValue } from "./staff-query.js";
 import { transitionRule } from "./status-transitions.js";
+import { registerActionRoutes } from "./actions-routes.js";
 import { singleValue } from "./ticket-query.js";
 import {
   MAX_ACTIVE_ATTACHMENTS,
@@ -444,22 +445,26 @@ async function createTicket(
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const ticketNumber = formatTicketNumber(now, existingToday + attempt + 1);
     try {
-      return await prisma.ticket.create({
-        data: {
-          ticketNumber,
-          submittedByUserId: requesterId,
-          categoryId: input.categoryId,
-          relatedSystemId: input.relatedSystemId,
-          summary: input.summary,
-          description: input.description,
-          requestedPriority: input.requestedPriority,
-          itPriority: input.requestedPriority,
-        },
-        include: {
-          submittedBy: { select: { id: true, displayName: true } },
-          category: { select: { id: true, name: true } },
-          relatedSystem: { select: { id: true, name: true } },
-        },
+      return await prisma.$transaction(async (tx) => {
+        const ticket = await tx.ticket.create({
+          data: {
+            ticketNumber,
+            submittedByUserId: requesterId,
+            categoryId: input.categoryId,
+            relatedSystemId: input.relatedSystemId,
+            summary: input.summary,
+            description: input.description,
+            requestedPriority: input.requestedPriority,
+            itPriority: input.requestedPriority,
+          },
+          include: {
+            submittedBy: { select: { id: true, displayName: true } },
+            category: { select: { id: true, name: true } },
+            relatedSystem: { select: { id: true, name: true } },
+          },
+        });
+        await tx.ticketWorkflowEvent.create({ data: { ticketId: ticket.id, actorId: requesterId, type: "CREATED", resultingTicketVersion: ticket.version, changes: { currentStatus: { before: null, after: ticket.currentStatus }, ownerId: { before: null, after: null } } } });
+        return ticket;
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) continue;
@@ -957,9 +962,14 @@ app.post("/api/tickets/:ticketId/problem-appears-resolved", async (req: Request,
       sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh and try again.");
       return;
     }
-    const updated = await prisma.ticket.updateMany({
-      where: { id: ticketId, version, currentStatus: "WAITING_FOR_REQUESTER", requesterResolvedAt: null },
-      data: { requesterResolvedAt: new Date(), requesterResolvedByUserId: session.user.id, version: { increment: 1 } },
+    const updated = await prisma.$transaction(async (tx) => {
+      const changedAt = new Date();
+      const change = await tx.ticket.updateMany({
+        where: { id: ticketId, version, currentStatus: "WAITING_FOR_REQUESTER", requesterResolvedAt: null },
+        data: { requesterResolvedAt: changedAt, requesterResolvedByUserId: session.user.id, version: { increment: 1 } },
+      });
+      if (change.count) await tx.ticketWorkflowEvent.create({ data: { ticketId, actorId: session.user.id, type: "REQUESTER_SIGNAL", occurredAt: changedAt, resultingTicketVersion: version + 1, changes: { requesterResolvedAt: { before: null, after: changedAt.toISOString() } } } });
+      return change;
     });
     if (updated.count === 0) {
       sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh and try again.");
@@ -969,6 +979,66 @@ app.post("/api/tickets/:ticketId/problem-appears-resolved", async (req: Request,
   } catch (error) {
     ticketFailure(res, error, "POST problem-appears-resolved", "The request could not be recorded. Please try again.");
   }
+});
+
+const activeStatuses = ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] as const;
+const dashboardTicketSelect = { id: true, ticketNumber: true, summary: true, currentStatus: true, updatedAt: true } as const;
+function dashboardWindow() {
+  const asOf = new Date();
+  const windowStart = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate() - 6));
+  return { asOf, windowStart };
+}
+function dashboardQueryValid(req: Request, res: Response) {
+  if (Object.keys(req.query).length) { sendError(res, 400, "INVALID_QUERY", "Dashboard query parameters are not supported."); return false; }
+  return true;
+}
+
+app.get("/api/dashboard/requester", async (req: Request, res: Response) => {
+  const session = await requireRequester(req, res);
+  if (!session || !dashboardQueryValid(req, res)) return;
+  const { asOf, windowStart } = dashboardWindow();
+  const own = { submittedByUserId: session.user.id };
+  const updated = { gte: windowStart, lte: asOf };
+  try {
+    const data = await getPrisma().$transaction(async (tx) => {
+      const [openTickets, waitingForYou, recentlyUpdated, recentlyResolved, recentTickets, attentionTickets] = await Promise.all([
+        tx.ticket.count({ where: { ...own, currentStatus: { in: [...activeStatuses] } } }),
+        tx.ticket.count({ where: { ...own, currentStatus: "WAITING_FOR_REQUESTER" } }),
+        tx.ticket.count({ where: { ...own, updatedAt: updated } }),
+        tx.ticket.count({ where: { ...own, currentStatus: "RESOLVED", lastStatusChangedAt: updated } }),
+        tx.ticket.findMany({ where: { ...own, updatedAt: updated }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 5, select: dashboardTicketSelect }),
+        tx.ticket.findMany({ where: { ...own, currentStatus: "WAITING_FOR_REQUESTER" }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 5, select: dashboardTicketSelect }),
+      ]);
+      return { asOf, windowStart, cards: { openTickets, waitingForYou, recentlyUpdated, recentlyResolved }, recentTickets, attentionTickets };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+    res.json({ data });
+  } catch (error) { ticketFailure(res, error, "GET /api/dashboard/requester", "Dashboard could not be loaded. Please try again."); }
+});
+
+app.get("/api/dashboard/staff", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF", "ADMINISTRATOR"]);
+  if (!session || !dashboardQueryValid(req, res)) return;
+  const { asOf, windowStart } = dashboardWindow();
+  const updated = { gte: windowStart, lte: asOf };
+  const activeActions: Prisma.ActionTakenWhereInput = { assigneeId: session.user.id, status: { in: ["PLANNED", "IN_PROGRESS"] }, ticket: { currentStatus: { in: [...activeStatuses] } } };
+  try {
+    const data = await getPrisma().$transaction(async (tx) => {
+      const [unassignedTickets, myTickets, myActiveActions, statuses, priorities, recentTickets, urgentTickets, actions] = await Promise.all([
+        tx.ticket.count({ where: { ownerId: null, currentStatus: { in: [...activeStatuses] } } }),
+        tx.ticket.count({ where: { ownerId: session.user.id, currentStatus: { in: [...activeStatuses] } } }),
+        tx.actionTaken.count({ where: activeActions }),
+        tx.ticket.groupBy({ by: ["currentStatus"], _count: { _all: true } }),
+        tx.ticket.groupBy({ by: ["itPriority"], _count: { _all: true } }),
+        tx.ticket.findMany({ where: { updatedAt: updated }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 5, select: { ...dashboardTicketSelect, itPriority: true } }),
+        tx.ticket.findMany({ where: { itPriority: "HIGH", currentStatus: { in: [...activeStatuses] } }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], take: 5, select: { ...dashboardTicketSelect, itPriority: true } }),
+        tx.actionTaken.findMany({ where: activeActions, orderBy: [{ actionAt: "asc" }, { id: "asc" }], take: 5, select: { id: true, ticketId: true, description: true, status: true, actionAt: true, ticket: { select: { ticketNumber: true } } } }),
+      ]);
+      const byStatus = Object.fromEntries(TICKET_STATUSES.map((status) => [status, statuses.find((row) => row.currentStatus === status)?._count._all ?? 0]));
+      const byItPriority = Object.fromEntries((["LOW", "MEDIUM", "HIGH"] as const).map((priority) => [priority, priorities.find((row) => row.itPriority === priority)?._count._all ?? 0]));
+      return { asOf, windowStart, cards: { unassignedTickets, myTickets, myActiveActions }, byStatus, byItPriority, recentTickets, urgentTickets, myActions: actions.map(({ ticket, ...action }) => ({ ...action, ticketNumber: ticket.ticketNumber })) };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+    res.json({ data });
+  } catch (error) { ticketFailure(res, error, "GET /api/dashboard/staff", "Dashboard could not be loaded. Please try again."); }
 });
 
 app.get("/api/tickets", async (req: Request, res: Response) => {
@@ -1004,6 +1074,10 @@ app.get("/api/tickets", async (req: Request, res: Response) => {
         ? { relatedSystemId: query.relatedSystemId }
         : {}),
       ...(query.status ? { currentStatus: query.status } : {}),
+      ...(query.view === "open" ? { currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
+      ...(query.view === "attention" ? { currentStatus: "WAITING_FOR_REQUESTER" } : {}),
+      ...(query.view === "recent-updated" ? { updatedAt: { gte: query.from, lte: query.through } } : {}),
+      ...(query.view === "recent-resolved" ? { currentStatus: "RESOLVED", lastStatusChangedAt: { gte: query.from, lte: query.through } } : {}),
       ...(query.requestedPriority
         ? { requestedPriority: query.requestedPriority }
         : {}),
@@ -1101,6 +1175,11 @@ app.get("/api/staff/tickets", async (req: Request, res: Response) => {
       ...(query.requestedPriority ? { requestedPriority: query.requestedPriority } : {}),
       ...(query.itPriority ? { itPriority: query.itPriority } : {}),
       ...ownerFilter,
+      ...(query.view === "unassigned" ? { ownerId: null, currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
+      ...(query.view === "owned-by-me" ? { ownerId: session.user.id, currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
+      ...(query.view === "my-active-actions" ? { actions: { some: { assigneeId: session.user.id, status: { in: ["PLANNED", "IN_PROGRESS"] } } }, currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
+      ...(query.view === "recent-updated" ? { updatedAt: { gte: query.from, lte: query.through } } : {}),
+      ...(query.view === "urgent" ? { itPriority: "HIGH", currentStatus: { in: ["NEW", "OPEN", "IN_PROGRESS", "WAITING_FOR_REQUESTER", "REOPENED"] } } : {}),
     };
     const sortField = query.sortBy === "status" ? "currentStatus" : query.sortBy;
     const orderBy: Prisma.TicketOrderByWithRelationInput[] = [{ [sortField]: query.sortOrder }, { id: query.sortOrder }];
@@ -1119,6 +1198,7 @@ app.get("/api/staff/tickets", async (req: Request, res: Response) => {
           requestedPriority: true, itPriority: true, currentStatus: true,
           owner: { select: { id: true, displayName: true, role: true } },
           requesterResolvedAt: true, createdAt: true, updatedAt: true, version: true,
+          ...(query.view === "my-active-actions" ? { actions: { where: { assigneeId: session.user.id, status: { in: ["PLANNED", "IN_PROGRESS"] } }, select: { id: true } } } : {}),
         },
       }),
       prisma.ticket.count(),
@@ -1127,7 +1207,7 @@ app.get("/api/staff/tickets", async (req: Request, res: Response) => {
     ]);
     const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / query.pageSize);
     res.status(200).json({
-      data: tickets.map(({ submittedBy, ...ticket }) => ({ ...ticket, requester: submittedBy })),
+      data: tickets.map(({ submittedBy, ...ticket }) => ({ ...ticket, requester: submittedBy, ...(query.view === "my-active-actions" && "actions" in ticket ? { matchingActionCount: (ticket.actions as { id: string }[]).length, actions: undefined } : {}) })),
       pagination: {
         page: query.page, pageSize: query.pageSize, totalItems, totalPages,
         hasPreviousPage: query.page > 1, hasNextPage: query.page < totalPages,
@@ -1227,10 +1307,25 @@ app.get("/api/staff/tickets/:ticketId", async (req: Request, res: Response) => {
   }
 });
 
+app.get("/api/staff/tickets/:ticketId/workflow-events", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF", "ADMINISTRATOR"]);
+  if (!session) return;
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) return sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+  try {
+    const prisma = getPrisma();
+    if (!await prisma.ticket.findUnique({ where: { id: ticketId }, select: { id: true } })) return sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+    const events = await prisma.ticketWorkflowEvent.findMany({ where: { ticketId }, include: { actor: { select: { id: true, displayName: true, role: true } } }, orderBy: [{ occurredAt: "asc" }, { id: "asc" }] });
+    res.json({ data: events.map(({ id, type, actor, occurredAt, resultingTicketVersion, subjectActionId, changes }) => ({ id, type, actor, occurredAt, resultingTicketVersion, subjectActionId, changes })) });
+  } catch (error) { ticketFailure(res, error, "GET workflow events", "Workflow history could not be loaded."); }
+});
+
 type MutationPlan = { data: Prisma.TicketUncheckedUpdateManyInput; where?: Prisma.TicketWhereInput } | { stop: true };
 type TicketForMutation = {
   currentStatus: TicketStatusValue;
   ownerId: number | null;
+  itPriority: "LOW" | "MEDIUM" | "HIGH";
+  requesterResolvedAt: Date | null;
   version: number;
   owner: { isActive: boolean; role: string } | null;
 };
@@ -1260,7 +1355,7 @@ async function mutateTicket(
     const prisma = getPrisma();
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
-      select: { currentStatus: true, ownerId: true, version: true, owner: { select: { isActive: true, role: true } } },
+      select: { currentStatus: true, ownerId: true, itPriority: true, requesterResolvedAt: true, version: true, owner: { select: { isActive: true, role: true } } },
     });
     if (!ticket) {
       sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
@@ -1271,15 +1366,30 @@ async function mutateTicket(
       sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", { version: "Version must be a non-negative integer." });
       return;
     }
-    const result = await plan(body, ticket as TicketForMutation, session.user.id);
-    if ("stop" in result) return;
     if (ticket.version !== version) {
       sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh before trying again.");
       return;
     }
-    const updated = await prisma.ticket.updateMany({
-      where: { id: ticketId, version, ...extraWhere(ticket as TicketForMutation), ...(result.where ?? {}) },
-      data: { ...result.data, version: { increment: 1 } },
+    const result = await plan(body, ticket as TicketForMutation, session.user.id);
+    if ("stop" in result) return;
+    const kind = req.path.split("/").at(-1);
+    const updated = await prisma.$transaction(async (tx) => {
+      const change = await tx.ticket.updateMany({
+        where: { id: ticketId, version, ...extraWhere(ticket as TicketForMutation), ...(result.where ?? {}) },
+        data: { ...result.data, version: { increment: 1 } },
+      });
+      if (!change.count) return change;
+      if (kind === "status" && body.status === "RESOLVED") {
+        const reopened = await tx.ticketWorkflowEvent.findFirst({ where: { ticketId, type: "STATUS_CHANGED", changes: { path: ["currentStatus", "after"], equals: "REOPENED" } }, orderBy: { resultingTicketVersion: "desc" } });
+        const qualifying = await tx.actionTaken.findFirst({ where: { ticketId, status: "COMPLETED", ...(reopened ? { completedTicketVersion: { gt: reopened.resultingTicketVersion } } : {}) }, select: { id: true } });
+        if (!qualifying) throw new Error("RESOLUTION_ACTION_REQUIRED");
+      }
+      const field = kind === "status" ? "currentStatus" : kind === "it-priority" ? "itPriority" : "ownerId";
+      const before = field === "currentStatus" ? ticket.currentStatus : field === "ownerId" ? ticket.ownerId : ticket.itPriority;
+      const after = field === "currentStatus" ? body.status : field === "itPriority" ? body.itPriority : kind === "claim" ? session.user.id : body.ownerId;
+      const signalCleared = kind === "status" && transitionRule(ticket.currentStatus, body.status as TicketStatusValue)?.clearsRequesterSignal && ticket.requesterResolvedAt;
+      await tx.ticketWorkflowEvent.create({ data: { ticketId, actorId: session.user.id, type: kind === "status" ? "STATUS_CHANGED" : kind === "it-priority" ? "PRIORITY_CHANGED" : "OWNER_CHANGED", resultingTicketVersion: version + 1, changes: { [field]: { before, after }, ...(signalCleared ? { requesterResolvedAt: { before: ticket.requesterResolvedAt?.toISOString(), after: null } } : {}) } } });
+      return change;
     });
     if (updated.count === 0) {
       sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh before trying again.");
@@ -1288,6 +1398,10 @@ async function mutateTicket(
     const detail = await staffTicketDetail(ticketId);
     res.status(200).json({ data: detail });
   } catch (error) {
+    if (error instanceof Error && error.message === "RESOLUTION_ACTION_REQUIRED") {
+      sendError(res, 409, "RESOLUTION_ACTION_REQUIRED", "Complete an action for this Ticket before resolving it.");
+      return;
+    }
     ticketFailure(res, error, `${req.method} ${req.path}`, "The change could not be saved. Please try again.");
   }
 }
@@ -1615,6 +1729,16 @@ app.all("/api/admin/*", async (req: Request, res: Response) => {
   const session = await requireRole(req, res, ["ADMINISTRATOR"]);
   if (!session) return;
   sendError(res, 501, "NOT_IMPLEMENTED", "This Administrator capability is not available yet.");
+});
+
+registerActionRoutes(app, { requireRole, originAndCsrfValid });
+
+app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (/^\/api\/tickets\/[^/]+\/actions(?:\/|$)/.test(req.path)) {
+    sendError(res, 400, "MALFORMED_REQUEST", "The request body is not valid.");
+    return;
+  }
+  next(error);
 });
 
 export default app;

@@ -594,6 +594,11 @@ textarea.form-control {
   overflow-wrap: anywhere;
 }
 
+.actions-list { display: grid; gap: 0.75rem; }
+.actions-list li, .actions-detail, .actions-taken dd { overflow-wrap: anywhere; min-width: 0; }
+.actions-taken .btn { min-height: 44px; }
+@media (max-width: 767px) { .actions-taken .actions-detail .btn, .actions-taken > div > .btn { width: 100%; } }
+
 .zen-table {
   border: 1px solid var(--border);
 }
@@ -652,3 +657,10 @@ textarea.form-control {
     display: none;
   }
 }
+
+.dashboard-card { border-top: 4px solid var(--zen-green, #23834c); }
+.dashboard-card a { margin-top: auto; min-height: 44px; display: inline-flex; align-items: center; }
+.dashboard-row { padding: .75rem 0; border-bottom: 1px solid #dce8df; overflow-wrap: anywhere; }
+.dashboard-row:last-child { border-bottom: 0; }
+.dashboard-buckets { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: .5rem; list-style: none; padding: 0; margin: 0; }
+.dashboard-buckets a { display: flex; align-items: center; min-height: 44px; padding: .35rem .5rem; border-radius: .35rem; background: #eef7ef; }

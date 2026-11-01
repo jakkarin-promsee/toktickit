@@ -11,6 +11,7 @@ const schema = readFileSync(resolve(prismaDirectory, "schema.prisma"), "utf8");
 const lab1Migration = resolve(prismaDirectory, "migrations", "20260812131716_add_category_model", "migration.sql");
 const lab2Migration = resolve(prismaDirectory, "migrations", "20260906074000_lab2_data_foundation", "migration.sql");
 const lab3Migration = resolve(prismaDirectory, "migrations", "20261004090000_lab3_user_data_foundation", "migration.sql");
+const lab4Migration = resolve(prismaDirectory, "migrations", "20261031090000_lab4_actions_foundation", "migration.sql");
 const cleanSchema = "lab3_migration_clean";
 const upgradeSchema = "lab3_migration_upgrade";
 const prismaCli = resolve(process.cwd(), "node_modules", "prisma", "build", "index.js");
@@ -240,6 +241,20 @@ describe("Issue #31 Lab 3 data migration", () => {
       expect(credentials).toHaveLength(2);
       expect(credentials.every((entry) => entry.passwordHash.startsWith("$argon2id$"))).toBe(true);
       expect(credentials.every((entry) => entry.passwordHash !== initialPassword)).toBe(true);
+
+      const preservedCounts = await upgrade.$queryRawUnsafe(`SELECT (SELECT count(*) FROM "User") AS users, (SELECT count(*) FROM "Ticket") AS tickets, (SELECT count(*) FROM "Attachment") AS attachments, (SELECT count(*) FROM "PublicComment") AS comments, (SELECT count(*) FROM "InternalNote") AS notes`);
+      const legacyBefore = await upgrade.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+      runPrisma(["db", "execute", "--file", lab4Migration], upgradeSchema);
+      expect(await upgrade.$queryRawUnsafe(`SELECT (SELECT count(*) FROM "User") AS users, (SELECT count(*) FROM "Ticket") AS tickets, (SELECT count(*) FROM "Attachment") AS attachments, (SELECT count(*) FROM "PublicComment") AS comments, (SELECT count(*) FROM "InternalNote") AS notes`)).toEqual(preservedCounts);
+      const legacyAfter = await upgrade.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: { actions: true, attachments: true } });
+      expect(legacyAfter.actions).toEqual([]);
+      expect(legacyAfter.attachments).toHaveLength(1);
+      expect(legacyAfter.currentStatus).toBe(legacyBefore.currentStatus);
+      expect(legacyAfter.version).toBe(legacyBefore.version);
+      expect(legacyAfter.updatedAt).toEqual(legacyBefore.updatedAt);
+      const baseline = await upgrade.ticketWorkflowEvent.findMany({ where: { ticketId, type: "BASELINE" } });
+      expect(baseline).toHaveLength(1);
+      expect(baseline[0].actorId).toBeNull();
     } finally {
       await upgrade.$disconnect();
     }

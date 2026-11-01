@@ -23,6 +23,7 @@ function mockApi(handler: Handler, comments: unknown[] = []) {
     const custom = handler(url, init);
     const result = custom ?? (url === "/api/auth/me" ? { status: 200, body: { data: me } }
       : url === `/api/tickets/${TICKET_ID}` ? { status: 200, body: { data: ticket() } }
+      : url === `/api/tickets/${TICKET_ID}/actions` ? { status: 200, body: { data: [] } }
       : url === `/api/tickets/${TICKET_ID}/comments` && !init?.method ? { status: 200, body: { data: comments } }
       : { status: 500, body: { error: { code: "INTERNAL_ERROR", message: "Unexpected." } } });
     return { ok: result.status < 400, status: result.status, headers: new Headers(), json: async () => result.body };

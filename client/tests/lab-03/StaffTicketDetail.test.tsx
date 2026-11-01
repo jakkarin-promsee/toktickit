@@ -29,6 +29,7 @@ function mockApi(handler: Handler = () => undefined, initial = detail()) {
     calls.push(call);
     const result = handler(call) ?? (url === "/api/auth/me" ? { status: 200, body: { data: staff } }
       : url === "/api/staff/assignees" ? { status: 200, body: { data: people } }
+      : url === `/api/tickets/${TICKET_ID}/actions` ? { status: 200, body: { data: [] } }
       : url === `/api/staff/tickets/${TICKET_ID}` ? { status: 200, body: { data: initial } }
       : { status: 500, body: { error: { code: "INTERNAL_ERROR", message: "Unexpected." } } });
     return { ok: result.status < 400, status: result.status, headers: new Headers(), json: async () => result.body };
@@ -65,7 +66,7 @@ describe("UI-06 Staff Ticket Detail", () => {
     expect(screen.getByLabelText("Status")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Public Comments" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Internal Notes" })).toBeInTheDocument();
-    expect(screen.queryByText(/Actions Taken/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Actions Taken/i })).toBeInTheDocument();
   });
 
   it("claims an unassigned ticket sending the current version", async () => {

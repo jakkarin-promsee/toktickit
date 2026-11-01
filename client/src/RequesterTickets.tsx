@@ -1,4 +1,5 @@
 import { FormEvent, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { ActionsTaken } from "./ActionsTaken.js";
 import {
   ApiError,
   attachmentDownloadUrl,
@@ -17,6 +18,7 @@ import {
   PublicComment,
   TicketDetail,
   TicketListItem,
+  TicketListResponse,
 } from "./api.js";
 import { describedBy, focusFirstInvalid, ModalDialog, PRIORITY_LABELS, PriorityBadge, StatusBadge } from "./ui.js";
 
@@ -27,19 +29,64 @@ function formatTime(value: string) {
 }
 
 export function MyTickets({ onOpen }: { onOpen: (event: MouseEvent<HTMLAnchorElement>, ticketId: string) => void }) {
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get("view") ?? undefined;
+  const [searchText, setSearchText] = useState((params.get("search") ?? "").slice(0, 120));
+  const [search, setSearch] = useState(searchText.trim());
+  const [page, setPage] = useState(() => {
+    const value = Number(params.get("page") ?? 1);
+    return Number.isSafeInteger(value) && value > 0 ? value : 1;
+  });
+  const [pagination, setPagination] = useState<TicketListResponse["pagination"] | null>(null);
+  const [reload, setReload] = useState(0);
+  const filtered = Boolean(view) || search !== "";
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
-  const load = useCallback(() => {
+  useEffect(() => {
+    const normalized = searchText.trim();
+    if (normalized === search) return;
+    const timer = window.setTimeout(() => { setSearch(normalized); setPage(1); }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchText, search]);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (search) url.searchParams.set("search", search);
+    else url.searchParams.delete("search");
+    if (page > 1) url.searchParams.set("page", String(page));
+    else url.searchParams.delete("page");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+  }, [search, page]);
+  useEffect(() => {
+    let live = true;
     setState("loading");
-    getMyTickets().then((result) => { setTickets(result.data); setState("ready"); }).catch(() => setState("failed"));
-  }, []);
-  useEffect(load, [load]);
+    const query = { view: view as "open" | "attention" | "recent-updated" | "recent-resolved" | undefined, from: params.get("from") ?? undefined, through: params.get("through") ?? undefined, search: search || undefined, page };
+    getMyTickets(query).then((result) => { if (live) { setTickets(result.data); setPagination(result.pagination); setState("ready"); } }).catch(() => { if (live) setState("failed"); });
+    return () => { live = false; };
+  }, [view, search, page, reload]);
+  const clear = () => {
+    setSearchText("");
+    setSearch("");
+    setPage(1);
+    const url = new URL(window.location.href);
+    url.search = "";
+    window.history.pushState({}, "", url.pathname);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
+  const start = pagination && pagination.totalItems > 0 ? (pagination.page - 1) * pagination.pageSize + 1 : 0;
+  const end = start ? start + tickets.length - 1 : 0;
   return (
     <section aria-labelledby="my-tickets-heading">
       <h1 id="my-tickets-heading">My Tickets</h1>
+      {view && <p>Filter: {view.replaceAll("-", " ")}</p>}
+      <form className="card zen-card p-3 mb-3" role="search" onSubmit={(event) => event.preventDefault()}>
+        <label htmlFor="my-tickets-search" className="form-label">Search tickets</label>
+        <input id="my-tickets-search" type="search" className="form-control" maxLength={120} value={searchText} aria-describedby="my-tickets-search-help" onChange={(event) => setSearchText(event.target.value)} />
+        <div id="my-tickets-search-help" className="form-text">Ticket number or summary</div>
+        {filtered && <div className="mt-2"><button type="button" className="btn btn-outline-secondary" onClick={clear}>Clear filters</button></div>}
+      </form>
       {state === "loading" && <p role="status">Loading tickets…</p>}
-      {state === "failed" && <div className="alert alert-danger" role="alert">Tickets could not be loaded. <button className="btn btn-sm btn-outline-secondary" onClick={load}>Retry</button></div>}
-      {state === "ready" && tickets.length === 0 && <p className="card zen-card p-3">You have not submitted any tickets yet.</p>}
+      {state === "failed" && <div className="alert alert-danger" role="alert">Tickets could not be loaded. <button className="btn btn-sm btn-outline-secondary" onClick={() => setReload((value) => value + 1)}>Retry</button></div>}
+      {state === "ready" && tickets.length === 0 && <p className="card zen-card p-3">{filtered ? "No Tickets match this filter." : "You have not submitted any tickets yet."}</p>}
       {state === "ready" && tickets.length > 0 && (
         <ul className="list-unstyled">
           {tickets.map((ticket) => (
@@ -50,6 +97,11 @@ export function MyTickets({ onOpen }: { onOpen: (event: MouseEvent<HTMLAnchorEle
           ))}
         </ul>
       )}
+      {state === "ready" && pagination && pagination.totalItems > 0 && <nav aria-label="My Tickets pages" className="d-flex flex-wrap align-items-center gap-2">
+        <span>Showing {start}–{end} of {pagination.totalItems}</span>
+        <button type="button" className="btn btn-outline-secondary btn-sm" disabled={!pagination.hasPreviousPage} onClick={() => setPage((value) => value - 1)}>Previous</button>
+        <button type="button" className="btn btn-outline-secondary btn-sm" disabled={!pagination.hasNextPage} onClick={() => setPage((value) => value + 1)}>Next</button>
+      </nav>}
     </section>
   );
 }
@@ -134,6 +186,8 @@ export function RequesterTicketDetail({ ticketId, user, onBack }: { ticketId: st
         </dl>
       </section>
 
+      <ActionsTaken ticketId={ticket.id} user={user} />
+
       <section className="card zen-card p-3 mb-3" aria-label="Attachments">
         <h2 className="h5">Attachments</h2>
         {ticket.attachments.length === 0 ? <p className="mb-0">No attachments.</p> : (
@@ -201,6 +255,7 @@ export function CreateTicket({ user, onCreated }: { user: CurrentUser; onCreated
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState("");
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const load = useCallback(() => {
@@ -218,7 +273,7 @@ export function CreateTicket({ user, onCreated }: { user: CurrentUser; onCreated
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || inFlight.current) return;
     const next: Record<string, string> = {};
     const summary = form.summary.trim();
     const description = form.description.trim();
@@ -228,6 +283,7 @@ export function CreateTicket({ user, onCreated }: { user: CurrentUser; onCreated
     if (Array.from(description).length < 10 || Array.from(description).length > 2000) next.description = "Description must contain 10–2,000 characters.";
     setErrors(next); setFailure("");
     if (Object.keys(next).length > 0) { focusFirstInvalid(formRef.current); return; }
+    inFlight.current = true;
     setBusy(true);
     try {
       const created = await createTicket({ categoryId: Number(form.categoryId), relatedSystemId: Number(form.relatedSystemId), summary, requestedPriority: form.requestedPriority as RequestedPriority, description }, user.csrfToken);
@@ -236,6 +292,7 @@ export function CreateTicket({ user, onCreated }: { user: CurrentUser; onCreated
       const failed = error as Error & { fields?: Record<string, string> };
       if (failed.fields) { setErrors(failed.fields); focusFirstInvalid(formRef.current); }
       setFailure(failed.message || "Ticket could not be created. Please try again.");
+      inFlight.current = false;
       setBusy(false);
     }
   }

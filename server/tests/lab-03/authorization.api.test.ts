@@ -62,6 +62,7 @@ describe("SEC-02 Issue #33 authorization boundaries", () => {
     expect(otherOwner.status).toBe(404);
     expect(otherOwner.body).toEqual(missing.body);
     await prisma.attachment.delete({ where: { id: attachment.id } });
+    await prisma.ticketWorkflowEvent.deleteMany({ where: { ticketId: ticket.id } });
     await prisma.ticket.delete({ where: { id: ticket.id } });
   });
 

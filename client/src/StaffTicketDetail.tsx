@@ -1,9 +1,10 @@
 import { FormEvent, KeyboardEvent, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
-  ApiError, attachmentDownloadUrl, CurrentUser, getAssignees, getStaffTicketDetail, PersonRef, postInternalNote, postTicketComment,
-  PublicComment, RequestedPriority, staffMutation, StaffTicketDetail as Detail,
+  ApiError, attachmentDownloadUrl, CurrentUser, getAssignees, getStaffTicketDetail, getTicketWorkflowEvents, PersonRef, postInternalNote, postTicketComment,
+  PublicComment, RequestedPriority, staffMutation, StaffTicketDetail as Detail, TicketWorkflowEvent,
 } from "./api.js";
 import { nextStatuses } from "./statusTransitions.js";
+import { ActionsTaken } from "./ActionsTaken.js";
 import { describedBy, ModalDialog, PRIORITY_LABELS, PriorityBadge, STATUS_LABELS, StatusBadge } from "./ui.js";
 
 const MAX_TEXT = 2000;
@@ -40,6 +41,9 @@ export function StaffTicketDetail({ ticketId, user, onBack, backLabel = "Back to
   const [busy, setBusy] = useState<string>("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [stale, setStale] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<TicketWorkflowEvent[]>([]);
+  const [historyError, setHistoryError] = useState("");
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [tab, setTab] = useState<Tab>("public");
   const [ownerChoice, setOwnerChoice] = useState("");
@@ -72,6 +76,10 @@ export function StaffTicketDetail({ ticketId, user, onBack, backLabel = "Back to
   useEffect(load, [load]);
   useEffect(() => { if (!readOnly) getAssignees().then(setAssignees).catch(() => undefined); }, [readOnly]);
 
+  function refreshHistory() {
+    getTicketWorkflowEvents(ticketId).then((events) => { setHistory(events); setHistoryError(""); }).catch(() => setHistoryError("Workflow history could not be loaded. Try again."));
+  }
+
   async function mutate(card: Card, path: string, method: "POST" | "PATCH", body: Record<string, unknown>, success: string) {
     if (!ticket || busy) return;
     setBusy(card); setFeedback(null); setConfirmation(null);
@@ -80,9 +88,11 @@ export function StaffTicketDetail({ ticketId, user, onBack, backLabel = "Back to
       setTicket((current) => current ? { ...current, ...updated, publicComments: current.publicComments, internalNotes: current.internalNotes } : current);
       setPriorityChoice(updated.itPriority); setOwnerChoice(""); setStale(false);
       setFeedback({ card, kind: "success", text: success });
+      if (historyOpen) refreshHistory();
     } catch (error) {
       const apiError = error as ApiError;
       if (apiError.code === "STALE_TICKET") { setStale(true); setFeedback({ card, kind: "error", text: STALE_MESSAGE }); }
+      else if (apiError.code === "RESOLUTION_ACTION_REQUIRED") setFeedback({ card, kind: "error", text: "Complete an action for this Ticket before resolving it." });
       else setFeedback({ card, kind: "error", text: apiError.message || "The change could not be saved. Please try again.", fields: apiError.fields });
     } finally { setBusy(""); }
   }
@@ -126,10 +136,10 @@ export function StaffTicketDetail({ ticketId, user, onBack, backLabel = "Back to
         <StatusBadge status={ticket.currentStatus} />
         <PriorityBadge kind="Requested" priority={ticket.requestedPriority} />
         <PriorityBadge kind="IT" priority={ticket.itPriority} />
-        {ticket.owner ? <span className="badge badge-owner">Owner: {ticket.owner.displayName}</span> : <span className="badge badge-owner-none">Unassigned</span>}
+        {ticket.owner ? <span className="badge badge-owner">Ticket Owner: {ticket.owner.displayName}</span> : <span className="badge badge-owner-none">Ticket Owner: Unassigned</span>}
       </p>
       <p className="small text-muted">Updated <time dateTime={ticket.updatedAt}>{formatTime(ticket.updatedAt)}</time></p>
-      {readOnly && <div className="alert alert-info" role="note">Read-only administrator view</div>}
+      {readOnly && <div className="alert alert-info" role="note">Ticket workflow is read-only for Administrators; Actions Taken may be managed here.</div>}
       {stale && <div className="alert alert-warning" role="alert">{STALE_MESSAGE} <button className="btn btn-sm btn-outline-secondary" onClick={load}>Refresh</button></div>}
 
       <div className="row g-3 mb-3">
@@ -199,10 +209,19 @@ export function StaffTicketDetail({ ticketId, user, onBack, backLabel = "Back to
                 </ul>
               )}
               {fb("status")}
+              {feedback?.card === "status" && feedback.text.includes("Complete an action") && <a href="#actions-taken">View Actions Taken</a>}
             </section>
           </div>
         )}
       </div>
+
+      <div id="actions-taken"><ActionsTaken ticketId={ticket.id} user={user} ticketVersion={ticket.version} ticketOwner={ticket.owner} ticketStatus={ticket.currentStatus} onWritten={(nextVersion) => { setTicket((current) => current ? { ...current, version: nextVersion } : current); void getStaffTicketDetail(ticket.id).then((fresh) => setTicket((current) => current ? { ...fresh, publicComments: current.publicComments, internalNotes: current.internalNotes } : current)).catch(() => undefined); if (historyOpen) refreshHistory(); }} /></div>
+
+      <section className="card zen-card p-3 mb-3" aria-label="Workflow history">
+        <h2 className="h5">Workflow history</h2>
+        <button className="btn btn-outline-secondary align-self-start" aria-expanded={historyOpen} onClick={() => { if (!historyOpen) refreshHistory(); setHistoryOpen(!historyOpen); }}>{historyOpen ? "Hide history" : "Show history"}</button>
+        {historyOpen && <div className="mt-2">{historyError ? <p role="alert">{historyError} <button className="btn btn-sm btn-outline-secondary" onClick={refreshHistory}>Retry</button></p> : history.length ? <ol>{history.map((event) => <li key={event.id}><strong>{event.type === "BASELINE" ? "State observed during migration" : event.type.replaceAll("_", " ")}</strong> · {event.actor?.displayName ?? "System"} · <time dateTime={event.occurredAt}>{formatTime(event.occurredAt)}</time>{event.type === "STATUS_CHANGED" && event.changes.currentStatus && <> · {String(event.changes.currentStatus.before)} → {String(event.changes.currentStatus.after)}</>}</li>)}</ol> : <p>No workflow history yet.</p>}</div>}
+      </section>
 
       {confirmation && (
         <ModalDialog labelledBy="confirm-title" describedBy="confirm-body" onCancel={() => setConfirmation(null)}>
