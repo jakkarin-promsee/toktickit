@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import { Prisma } from "@prisma/client";
 import crypto from "node:crypto";
@@ -27,6 +27,7 @@ import {
 import { parseTicketQuery } from "./ticket-query.js";
 import { parseStaffQuery, StaffQuery, TICKET_STATUSES, TicketStatusValue } from "./staff-query.js";
 import { transitionRule } from "./status-transitions.js";
+import { registerActionRoutes } from "./actions-routes.js";
 import { singleValue } from "./ticket-query.js";
 import {
   MAX_ACTIVE_ATTACHMENTS,
@@ -1615,6 +1616,16 @@ app.all("/api/admin/*", async (req: Request, res: Response) => {
   const session = await requireRole(req, res, ["ADMINISTRATOR"]);
   if (!session) return;
   sendError(res, 501, "NOT_IMPLEMENTED", "This Administrator capability is not available yet.");
+});
+
+registerActionRoutes(app, { requireRole, originAndCsrfValid });
+
+app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (/^\/api\/tickets\/[^/]+\/actions(?:\/|$)/.test(req.path)) {
+    sendError(res, 400, "MALFORMED_REQUEST", "The request body is not valid.");
+    return;
+  }
+  next(error);
 });
 
 export default app;

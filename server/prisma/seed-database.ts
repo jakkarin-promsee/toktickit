@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { hashPassword, passwordPolicyError } from "../src/password.js";
 import {
+  ACTION_SEEDS,
   CATEGORY_SEEDS,
   INTERNAL_NOTE_SEEDS,
   PUBLIC_COMMENT_SEEDS,
@@ -20,7 +21,7 @@ export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): 
   for (const category of CATEGORY_SEEDS) {
     await prisma.category.upsert({
       where: { name: category.name },
-      update: { isActive: category.isActive },
+      update: {},
       create: category,
     });
   }
@@ -28,7 +29,7 @@ export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): 
   for (const relatedSystem of RELATED_SYSTEM_SEEDS) {
     await prisma.relatedSystem.upsert({
       where: { name: relatedSystem.name },
-      update: { isActive: relatedSystem.isActive },
+      update: {},
       create: relatedSystem,
     });
   }
@@ -36,11 +37,7 @@ export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): 
   for (const user of USER_SEEDS) {
     await prisma.user.upsert({
       where: { email: user.email },
-      update: {
-        displayName: user.displayName,
-        role: user.role,
-        isActive: user.isActive,
-      },
+      update: {},
       create: {
         ...user,
         mustChangePassword: true,
@@ -74,12 +71,7 @@ export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): 
     };
     await prisma.ticket.upsert({
       where: { ticketNumber: ticket.ticketNumber },
-      update: {
-        ...shared,
-        owner: ticket.ownerEmail
-          ? { connect: { email: ticket.ownerEmail } }
-          : { disconnect: true },
-      },
+      update: {},
       create: {
         id: ticket.id,
         ticketNumber: ticket.ticketNumber,
@@ -94,11 +86,7 @@ export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): 
   for (const comment of PUBLIC_COMMENT_SEEDS) {
     await prisma.publicComment.upsert({
       where: { id: comment.id },
-      update: {
-        content: comment.content,
-        ticket: { connect: { ticketNumber: comment.ticketNumber } },
-        author: { connect: { email: comment.authorEmail } },
-      },
+      update: {},
       create: {
         id: comment.id,
         content: comment.content,
@@ -111,11 +99,7 @@ export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): 
   for (const note of INTERNAL_NOTE_SEEDS) {
     await prisma.internalNote.upsert({
       where: { id: note.id },
-      update: {
-        content: note.content,
-        ticket: { connect: { ticketNumber: note.ticketNumber } },
-        author: { connect: { email: note.authorEmail } },
-      },
+      update: {},
       create: {
         id: note.id,
         content: note.content,
@@ -123,5 +107,52 @@ export async function seedDatabase(prisma: PrismaClient, options: SeedOptions): 
         author: { connect: { email: note.authorEmail } },
       },
     });
+  }
+
+  // Lab 3 upgrade tests invoke this shared seed before the Lab 4 migration exists.
+  const [actionTable] = await prisma.$queryRaw<{ name: string | null }[]>`SELECT to_regclass('"ActionTaken"')::text AS name`;
+  if (!actionTable?.name) return;
+
+  for (const fixture of ACTION_SEEDS) {
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { ticketNumber: fixture.ticketNumber } });
+    const performer = await prisma.user.findUniqueOrThrow({ where: { email: fixture.performerEmail } });
+    const assignee = fixture.assigneeEmail ? await prisma.user.findUniqueOrThrow({ where: { email: fixture.assigneeEmail } }) : null;
+    const actionAt = new Date(ticket.createdAt.getTime() + 60_000);
+    const completed = fixture.status === "COMPLETED";
+    const cancelled = fixture.status === "CANCELLED";
+    await prisma.actionTaken.upsert({
+      where: { id: fixture.id },
+      update: {},
+      create: {
+        id: fixture.id,
+        ticketId: ticket.id,
+        actionAt,
+        description: fixture.description,
+        result: fixture.result,
+        status: fixture.status,
+        createdByUserId: performer.id,
+        performedByUserId: performer.id,
+        assigneeId: assignee?.id ?? null,
+        followUpRequired: fixture.followUpRequired,
+        followUpNote: fixture.followUpNote,
+        completedAt: completed ? actionAt : null,
+        completedByUserId: completed ? performer.id : null,
+        completedTicketVersion: completed ? ticket.version : null,
+        cancelledAt: cancelled ? actionAt : null,
+        cancelledByUserId: cancelled ? performer.id : null,
+        cancellationReason: cancelled ? "Superseded by a new investigation" : null,
+      },
+    });
+    const eventId = fixture.id.replace("34a00000", "34e00000");
+    await prisma.actionEvent.upsert({
+      where: { id: eventId }, update: {},
+      create: { id: eventId, ticketId: ticket.id, actionId: fixture.id, actorId: performer.id, type: "CREATED", occurredAt: actionAt, resultingActionVersion: 0, resultingTicketVersion: ticket.version, changes: { status: { before: null, after: "PLANNED" }, description: { before: null, after: fixture.description } } },
+    });
+    if (completed || cancelled) {
+      await prisma.actionEvent.upsert({
+        where: { id: fixture.id.replace("34a00000", "34f00000") }, update: {},
+        create: { id: fixture.id.replace("34a00000", "34f00000"), ticketId: ticket.id, actionId: fixture.id, actorId: performer.id, type: completed ? "COMPLETED" : "CANCELLED", occurredAt: new Date(actionAt.getTime() + 1_000), resultingActionVersion: 0, resultingTicketVersion: ticket.version, changes: { status: { before: "PLANNED", after: fixture.status } } },
+      });
+    }
   }
 }
