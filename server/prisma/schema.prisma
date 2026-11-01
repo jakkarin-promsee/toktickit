@@ -39,6 +39,32 @@ enum TicketStatus {
   CANCELLED
 }
 
+enum ActionStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ActionEventType {
+  CREATED
+  EDITED
+  ASSIGNED
+  STATUS_CHANGED
+  COMPLETED
+  CANCELLED
+}
+
+enum TicketWorkflowEventType {
+  BASELINE
+  CREATED
+  STATUS_CHANGED
+  OWNER_CHANGED
+  PRIORITY_CHANGED
+  REQUESTER_SIGNAL
+  ACTION_CHANGED
+}
+
 model User {
   id                         Int             @id @default(autoincrement())
   email                      String          @unique @db.VarChar(254)
@@ -61,6 +87,14 @@ model User {
   removedAttachments         Attachment[]    @relation("AttachmentRemover")
   publicComments             PublicComment[] @relation("PublicCommentAuthor")
   internalNotes              InternalNote[]  @relation("InternalNoteAuthor")
+  createdActions             ActionTaken[]   @relation("ActionCreator")
+  performedActions           ActionTaken[]   @relation("ActionPerformer")
+  assignedActions            ActionTaken[]   @relation("ActionAssignee")
+  completedActions           ActionTaken[]   @relation("ActionCompleter")
+  cancelledActions           ActionTaken[]   @relation("ActionCanceller")
+  actionEvents               ActionEvent[]   @relation("ActionEventActor")
+  actionCreateRequests       ActionCreateRequest[]
+  ticketWorkflowEvents       TicketWorkflowEvent[] @relation("WorkflowEventActor")
 
   @@index([isActive, displayName, id])
   @@index([role, isActive, displayName, id])
@@ -145,6 +179,9 @@ model Ticket {
   attachments                 Attachment[]
   publicComments              PublicComment[]
   internalNotes               InternalNote[]
+  actions                     ActionTaken[]
+  actionCreateRequests        ActionCreateRequest[]
+  workflowEvents              TicketWorkflowEvent[]
 
   @@index([submittedByUserId, updatedAt, id])
   @@index([submittedByUserId, createdAt, id])
@@ -213,4 +250,90 @@ model InternalNote {
 
   @@index([ticketId, createdAt, id])
   @@index([authorId])
+}
+
+model ActionTaken {
+  id                       String       @id @default(uuid()) @db.Uuid
+  ticketId                 String       @db.Uuid
+  actionAt                 DateTime     @db.Timestamptz(3)
+  description              String       @db.VarChar(2000)
+  result                   String       @default("") @db.VarChar(2000)
+  status                   ActionStatus @default(PLANNED)
+  createdByUserId          Int
+  performedByUserId        Int
+  assigneeId               Int?
+  followUpRequired         Boolean      @default(false)
+  followUpNote             String?      @db.VarChar(1000)
+  attachmentNotes          String?      @db.VarChar(500)
+  completedAt              DateTime?    @db.Timestamptz(3)
+  completedByUserId        Int?
+  completedTicketVersion   Int?
+  cancelledAt              DateTime?    @db.Timestamptz(3)
+  cancelledByUserId        Int?
+  cancellationReason       String?      @db.VarChar(500)
+  version                  Int          @default(0)
+  createdAt                DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  ticket                   Ticket       @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  createdBy                User         @relation("ActionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  performedBy              User         @relation("ActionPerformer", fields: [performedByUserId], references: [id], onDelete: Restrict)
+  assignee                 User?        @relation("ActionAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  completedBy              User?        @relation("ActionCompleter", fields: [completedByUserId], references: [id], onDelete: Restrict)
+  cancelledBy              User?        @relation("ActionCanceller", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+  events                   ActionEvent[]
+  createRequests           ActionCreateRequest[]
+
+  @@index([ticketId, actionAt, createdAt, id])
+  @@index([assigneeId, status, actionAt])
+  @@index([performedByUserId])
+  @@index([status, completedTicketVersion])
+}
+
+model ActionEvent {
+  id                     String          @id @default(uuid()) @db.Uuid
+  actionId               String          @db.Uuid
+  ticketId               String          @db.Uuid
+  type                   ActionEventType
+  actorId                Int
+  occurredAt             DateTime        @default(now()) @db.Timestamptz(3)
+  resultingActionVersion Int
+  resultingTicketVersion Int
+  changes                Json
+  action                 ActionTaken     @relation(fields: [actionId], references: [id], onDelete: Restrict)
+  actor                  User            @relation("ActionEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([actionId, occurredAt, id])
+  @@index([ticketId, occurredAt, id])
+}
+
+model ActionCreateRequest {
+  actorId         Int
+  ticketId        String      @db.Uuid
+  idempotencyKey  String      @db.Uuid
+  requestHash     String      @db.Char(64)
+  actionId        String      @db.Uuid
+  response        Json
+  createdAt       DateTime    @default(now()) @db.Timestamptz(3)
+  actor           User        @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  ticket          Ticket      @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  action          ActionTaken @relation(fields: [actionId], references: [id], onDelete: Restrict)
+
+  @@id([actorId, ticketId, idempotencyKey])
+  @@index([actionId])
+}
+
+model TicketWorkflowEvent {
+  id                     String                  @id @default(uuid()) @db.Uuid
+  ticketId               String                  @db.Uuid
+  type                   TicketWorkflowEventType
+  actorId                Int?
+  subjectActionId        String?                 @db.Uuid
+  occurredAt             DateTime                @default(now()) @db.Timestamptz(3)
+  resultingTicketVersion Int
+  changes                Json
+  ticket                 Ticket                  @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  actor                  User?                   @relation("WorkflowEventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, occurredAt, id])
+  @@index([ticketId, type, resultingTicketVersion])
 }
