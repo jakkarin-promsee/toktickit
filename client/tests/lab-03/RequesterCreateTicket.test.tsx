@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../../src/App.js";
 
@@ -57,6 +57,23 @@ describe("UI-04 Requester Create Ticket", () => {
     const body = JSON.parse((post[1] as RequestInit).body as string);
     expect(Object.keys(body).sort()).toEqual(["categoryId", "description", "relatedSystemId", "requestedPriority", "summary"]);
     expect((post[1] as RequestInit).headers).toMatchObject({ "X-CSRF-Token": me.csrfToken });
+  });
+
+  it("sends one create request when submit fires twice before the first response", async () => {
+    const user = userEvent.setup();
+    const originalFetch = mockApi();
+    let release!: (response: { ok: boolean; status: number; headers: Headers; json: () => Promise<unknown> }) => void;
+    const pending = new Promise<{ ok: boolean; status: number; headers: Headers; json: () => Promise<unknown> }>((resolve) => { release = resolve; });
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith("/api/tickets") && init?.method === "POST" ? pending : originalFetch(input, init));
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.replaceState({}, "", "/tickets/new");
+    render(<App />);
+    await fillValid(user);
+    const form = screen.getByRole("button", { name: "Submit ticket" }).closest("form")!;
+    act(() => { fireEvent.submit(form); fireEvent.submit(form); });
+    expect(fetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === "POST")).toHaveLength(1);
+    await act(async () => { release({ ok: true, status: 201, headers: new Headers(), json: async () => ({ data: { id: NEW_ID } }) }); });
+    await vi.waitFor(() => expect(window.location.pathname).toBe(`/tickets/${NEW_ID}`));
   });
 
   it("shows server field errors and keeps the input on failure", async () => {

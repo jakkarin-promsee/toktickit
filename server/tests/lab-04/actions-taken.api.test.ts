@@ -169,6 +169,23 @@ describe("Actions Taken API", () => {
     expect(completed.body.data.status).toBe("COMPLETED");
   });
 
+  it("cancels an In Progress Action with an auditable reason and rejects later edits", async () => {
+    const owner = await login("narin.staff@example.test");
+    const created = await createAction(owner.agent, owner.headers, ticketId, { result: "Investigation stopped" });
+    expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
+    const started = await owner.agent.patch(`/api/tickets/${ticketId}/actions/${id}/status`).set(owner.headers).send({ ticketVersion: created.body.data.ticketVersion, actionVersion: 0, status: "IN_PROGRESS" });
+    expect(started.status).toBe(200);
+    const missingReason = await owner.agent.patch(`/api/tickets/${ticketId}/actions/${id}/status`).set(owner.headers).send({ ticketVersion: started.body.data.ticketVersion, actionVersion: 1, status: "CANCELLED" });
+    expect(missingReason.status).toBe(422);
+    const cancelled = await owner.agent.patch(`/api/tickets/${ticketId}/actions/${id}/status`).set(owner.headers).send({ ticketVersion: started.body.data.ticketVersion, actionVersion: 1, status: "CANCELLED", reason: "Work superseded" });
+    expect(cancelled.status).toBe(200);
+    expect(cancelled.body.data).toMatchObject({ status: "CANCELLED", cancellationReason: "Work superseded", cancelledBy: { id: ownerId } });
+    const later = await owner.agent.patch(`/api/tickets/${ticketId}/actions/${id}`).set(owner.headers).send({ ticketVersion: cancelled.body.data.ticketVersion, actionVersion: 2, actionAt: cancelled.body.data.actionAt, description: "Must not change", result: "", followUpRequired: false, followUpNote: null, attachmentNotes: null });
+    expect(later.body.error.code).toBe("INVALID_ACTION_TRANSITION");
+    expect((await prisma.actionEvent.findMany({ where: { actionId: id }, orderBy: [{ occurredAt: "asc" }, { id: "asc" }] })).map((event) => event.type)).toEqual(["CREATED", "STATUS_CHANGED", "CANCELLED"]);
+  });
+
   it("rejects malformed JSON and impossible dates, and keeps a retry from adding another Action", async () => {
     const staff = await login("narin.staff@example.test");
     const malformed = await staff.agent.post(`/api/tickets/${ticketId}/actions`).set(staff.headers).set("Content-Type", "application/json").set("Idempotency-Key", crypto.randomUUID()).send("{broken");

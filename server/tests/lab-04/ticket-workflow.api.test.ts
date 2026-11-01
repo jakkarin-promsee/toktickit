@@ -106,6 +106,37 @@ describe("Ticket workflow API", () => {
     expect(history.body.data[0].actor).toBeNull();
   });
 
+  it("does not count an In Progress Action or a Completed Action from another Ticket", async () => {
+    const row = await ticket();
+    const other = await ticket();
+    await prisma.actionTaken.create({ data: { ticketId: row.id, actionAt: new Date(), description: "Still working", status: "IN_PROGRESS", createdByUserId: ownerId, performedByUserId: ownerId, assigneeId: ownerId, followUpRequired: false } });
+    await completed(other.id, 0);
+    const staff = await login("narin.staff@example.test");
+    const response = await staff.agent.patch(`/api/staff/tickets/${row.id}/status`).set(staff.headers).send({ status: "RESOLVED", version: 0, confirmed: true });
+    expect(response.body.error.code).toBe("RESOLUTION_ACTION_REQUIRED");
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: row.id } })).currentStatus).toBe("IN_PROGRESS");
+    expect(await prisma.ticketWorkflowEvent.count({ where: { ticketId: row.id } })).toBe(0);
+  });
+
+  it("serializes a concurrent Action completion and resolution without a partial Ticket transition", async () => {
+    const row = await ticket();
+    const staff = await login("narin.staff@example.test");
+    const created = await staff.agent.post(`/api/tickets/${row.id}/actions`).set(staff.headers).set("Idempotency-Key", crypto.randomUUID()).send({ ticketVersion: 0, actionAt: new Date(row.createdAt.getTime() + 120_000).toISOString(), description: "Concurrent repair", result: "Restored", assigneeId: ownerId, followUpRequired: false, followUpNote: null, attachmentNotes: null });
+    expect(created.status).toBe(201);
+    const version = created.body.data.ticketVersion as number;
+    const [completion, resolution] = await Promise.all([
+      staff.agent.patch(`/api/tickets/${row.id}/actions/${created.body.data.id}/status`).set(staff.headers).send({ ticketVersion: version, actionVersion: 0, status: "COMPLETED" }),
+      staff.agent.patch(`/api/staff/tickets/${row.id}/status`).set(staff.headers).send({ status: "RESOLVED", version, confirmed: true }),
+    ]);
+    expect(completion.status).toBe(200);
+    expect(resolution.status).toBe(409);
+    expect(["STALE_TICKET", "RESOLUTION_ACTION_REQUIRED"]).toContain(resolution.body.error.code);
+    expect((await prisma.ticket.findUniqueOrThrow({ where: { id: row.id } })).currentStatus).toBe("IN_PROGRESS");
+    expect((await prisma.ticketWorkflowEvent.findMany({ where: { ticketId: row.id } })).map((event) => event.type)).toEqual(["ACTION_CHANGED", "ACTION_CHANGED"]);
+    const resolved = await staff.agent.patch(`/api/staff/tickets/${row.id}/status`).set(staff.headers).send({ status: "RESOLVED", version: completion.body.data.ticketVersion, confirmed: true });
+    expect(resolved.status).toBe(200);
+  });
+
   it("resolves with qualifying completed work, records actor and history, and rejects a stale retry", async () => {
     const row = await ticket();
     await completed(row.id, 0);

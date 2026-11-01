@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
 import { accounts, apiSession, apiUrl, clientOrigin, openMenuIfCollapsed, signIn, signInReady, tickets } from "./helpers";
 import { expectNoOverflow, viewports } from "./layout";
 
@@ -7,9 +8,17 @@ import { expectNoOverflow, viewports } from "./layout";
 const root = "artifacts/lab-03/screenshots";
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
 
+async function saveScreenshot(page: Page, path: string, fullPage = true) {
+  const buffer = await page.screenshot({ fullPage, animations: "disabled" });
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try { await writeFile(path, buffer); return; }
+    catch (error) { if (attempt === 4 || !["UNKNOWN", "EBUSY", "EPERM"].includes((error as { code?: string }).code ?? "")) throw error; await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1))); }
+  }
+}
+
 async function shot(page: Page, folder: string, name: string, fullPage = true) {
   await expectNoOverflow(page, `${folder}/${name}`);
-  await page.screenshot({ path: `${root}/${folder}/${name}.png`, fullPage, animations: "disabled" });
+  await saveScreenshot(page, `${root}/${folder}/${name}.png`, fullPage);
 }
 
 /** Holds a request open so the loading or busy state stays on screen for the screenshot. */
@@ -27,8 +36,12 @@ test.describe("VISUAL-01 screenshot evidence @visual", () => {
     // One readable Attachment on the Staff evidence Ticket, uploaded by its Requester through the real API.
     const context = await playwright.request.newContext();
     const headers = await apiSession(context, accounts.mali.email);
-    const upload = await context.post(`${apiUrl}/api/tickets/${tickets.maliOpen.id}/attachments`, { headers, multipart: { file: { name: "classroom-wifi-signal.png", mimeType: "image/png", buffer: png } } });
-    expect(upload.status()).toBe(201);
+    const existing = await context.get(`${apiUrl}/api/tickets/${tickets.maliOpen.id}/attachments`);
+    expect(existing.status()).toBe(200);
+    if (!((await existing.json()).data as Array<{ originalName: string }>).some((item) => item.originalName === "classroom-wifi-signal.png")) {
+      const upload = await context.post(`${apiUrl}/api/tickets/${tickets.maliOpen.id}/attachments`, { headers, multipart: { file: { name: "classroom-wifi-signal.png", mimeType: "image/png", buffer: png } } });
+      expect(upload.status()).toBe(201);
+    }
     await context.dispose();
   });
 
@@ -40,7 +53,7 @@ test.describe("VISUAL-01 screenshot evidence @visual", () => {
       await page.goto("/");
       await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
       await shot(page, "authentication", `${v}-login`);
-      await page.screenshot({ path: `${root}/before-after/after-${v}-login.png`, fullPage: true, animations: "disabled" });
+      await saveScreenshot(page, `${root}/before-after/after-${v}-login.png`);
 
       await signInReady(page, accounts.pim.email);
       // Wait for the list itself, not just the shell, so the evidence never shows "Loading tickets…".
@@ -49,7 +62,7 @@ test.describe("VISUAL-01 screenshot evidence @visual", () => {
       await page.goto(`/tickets/${tickets.pimWaiting.id}`);
       await expect(page.getByRole("heading", { name: tickets.pimWaiting.summary })).toBeVisible();
       await shot(page, "requester", `${v}-ticket-detail`);
-      await page.screenshot({ path: `${root}/before-after/after-${v}-requester-detail.png`, fullPage: true, animations: "disabled" });
+      await saveScreenshot(page, `${root}/before-after/after-${v}-requester-detail.png`);
       if (v === "mobile") {
         await openMenuIfCollapsed(page);
         await shot(page, "authentication", `${v}-shell-menu-open`, false);
@@ -60,15 +73,15 @@ test.describe("VISUAL-01 screenshot evidence @visual", () => {
       await signInReady(page, accounts.narin.email);
       await expect(page.getByText(/^Showing /)).toBeVisible();
       await shot(page, "staff-queue", `${v}-queue`);
-      await page.screenshot({ path: `${root}/before-after/after-${v}-staff-queue.png`, fullPage: true, animations: "disabled" });
+      await saveScreenshot(page, `${root}/before-after/after-${v}-staff-queue.png`);
       await page.goto(`/staff/tickets/${tickets.maliOpen.id}`);
       await expect(page.getByRole("heading", { name: tickets.maliOpen.number })).toBeVisible();
       await shot(page, "staff-ticket-detail", `${v}-detail-public-comments`);
-      await page.screenshot({ path: `${root}/before-after/after-${v}-staff-detail.png`, fullPage: true, animations: "disabled" });
+      await saveScreenshot(page, `${root}/before-after/after-${v}-staff-detail.png`);
       await page.getByRole("tab", { name: "Internal Notes" }).click();
       await shot(page, "staff-ticket-detail", `${v}-detail-internal-notes`);
       await page.getByRole("tab", { name: "Attachments" }).click();
-      await expect(page.getByRole("link", { name: "classroom-wifi-signal.png" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "classroom-wifi-signal.png" }).first()).toBeVisible();
       await shot(page, "staff-ticket-detail", `${v}-detail-attachments`);
       await openMenuIfCollapsed(page);
       await page.getByRole("button", { name: "Logout" }).click();
@@ -76,7 +89,7 @@ test.describe("VISUAL-01 screenshot evidence @visual", () => {
       await signInReady(page, accounts.araya.email);
       await expect(page.getByText(accounts.narin.email).locator("visible=true").first()).toBeVisible();
       await shot(page, "user-management", `${v}-user-list`);
-      await page.screenshot({ path: `${root}/before-after/after-${v}-user-management.png`, fullPage: true, animations: "disabled" });
+      await saveScreenshot(page, `${root}/before-after/after-${v}-user-management.png`);
       await page.getByRole("button", { name: "Create user" }).first().click();
       await expect(page.getByLabel("Display name")).toBeFocused();
       await shot(page, "user-management", `${v}-create-panel`);
@@ -242,7 +255,7 @@ test.describe("VISUAL-01 screenshot evidence @visual", () => {
     await page.getByRole("button", { name: "Logout" }).click();
     await signInReady(page, accounts.araya.email);
     await page.goto(`/staff/tickets/${tickets.maliOpen.id}`);
-    await expect(page.getByText("Read-only administrator view")).toBeVisible();
+    await expect(page.getByText(/Ticket workflow is read-only for Administrators/)).toBeVisible();
     await shot(page, "staff-ticket-detail", "desktop-administrator-read-only");
     await page.setViewportSize({ width: 390, height: 844 });
     await shot(page, "staff-ticket-detail", "mobile-administrator-read-only");
