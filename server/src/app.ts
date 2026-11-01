@@ -445,22 +445,26 @@ async function createTicket(
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const ticketNumber = formatTicketNumber(now, existingToday + attempt + 1);
     try {
-      return await prisma.ticket.create({
-        data: {
-          ticketNumber,
-          submittedByUserId: requesterId,
-          categoryId: input.categoryId,
-          relatedSystemId: input.relatedSystemId,
-          summary: input.summary,
-          description: input.description,
-          requestedPriority: input.requestedPriority,
-          itPriority: input.requestedPriority,
-        },
-        include: {
-          submittedBy: { select: { id: true, displayName: true } },
-          category: { select: { id: true, name: true } },
-          relatedSystem: { select: { id: true, name: true } },
-        },
+      return await prisma.$transaction(async (tx) => {
+        const ticket = await tx.ticket.create({
+          data: {
+            ticketNumber,
+            submittedByUserId: requesterId,
+            categoryId: input.categoryId,
+            relatedSystemId: input.relatedSystemId,
+            summary: input.summary,
+            description: input.description,
+            requestedPriority: input.requestedPriority,
+            itPriority: input.requestedPriority,
+          },
+          include: {
+            submittedBy: { select: { id: true, displayName: true } },
+            category: { select: { id: true, name: true } },
+            relatedSystem: { select: { id: true, name: true } },
+          },
+        });
+        await tx.ticketWorkflowEvent.create({ data: { ticketId: ticket.id, actorId: requesterId, type: "CREATED", resultingTicketVersion: ticket.version, changes: { currentStatus: { before: null, after: ticket.currentStatus }, ownerId: { before: null, after: null } } } });
+        return ticket;
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) continue;
@@ -958,9 +962,14 @@ app.post("/api/tickets/:ticketId/problem-appears-resolved", async (req: Request,
       sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh and try again.");
       return;
     }
-    const updated = await prisma.ticket.updateMany({
-      where: { id: ticketId, version, currentStatus: "WAITING_FOR_REQUESTER", requesterResolvedAt: null },
-      data: { requesterResolvedAt: new Date(), requesterResolvedByUserId: session.user.id, version: { increment: 1 } },
+    const updated = await prisma.$transaction(async (tx) => {
+      const changedAt = new Date();
+      const change = await tx.ticket.updateMany({
+        where: { id: ticketId, version, currentStatus: "WAITING_FOR_REQUESTER", requesterResolvedAt: null },
+        data: { requesterResolvedAt: changedAt, requesterResolvedByUserId: session.user.id, version: { increment: 1 } },
+      });
+      if (change.count) await tx.ticketWorkflowEvent.create({ data: { ticketId, actorId: session.user.id, type: "REQUESTER_SIGNAL", occurredAt: changedAt, resultingTicketVersion: version + 1, changes: { requesterResolvedAt: { before: null, after: changedAt.toISOString() } } } });
+      return change;
     });
     if (updated.count === 0) {
       sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh and try again.");
@@ -1228,10 +1237,25 @@ app.get("/api/staff/tickets/:ticketId", async (req: Request, res: Response) => {
   }
 });
 
+app.get("/api/staff/tickets/:ticketId/workflow-events", async (req: Request, res: Response) => {
+  const session = await requireRole(req, res, ["IT_STAFF", "ADMINISTRATOR"]);
+  if (!session) return;
+  const { ticketId } = req.params;
+  if (!UUID_PATTERN.test(ticketId)) return sendError(res, 400, "INVALID_TICKET_ID", "Ticket ID must be a valid UUID.");
+  try {
+    const prisma = getPrisma();
+    if (!await prisma.ticket.findUnique({ where: { id: ticketId }, select: { id: true } })) return sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
+    const events = await prisma.ticketWorkflowEvent.findMany({ where: { ticketId }, include: { actor: { select: { id: true, displayName: true, role: true } } }, orderBy: [{ occurredAt: "asc" }, { id: "asc" }] });
+    res.json({ data: events.map(({ id, type, actor, occurredAt, resultingTicketVersion, subjectActionId, changes }) => ({ id, type, actor, occurredAt, resultingTicketVersion, subjectActionId, changes })) });
+  } catch (error) { ticketFailure(res, error, "GET workflow events", "Workflow history could not be loaded."); }
+});
+
 type MutationPlan = { data: Prisma.TicketUncheckedUpdateManyInput; where?: Prisma.TicketWhereInput } | { stop: true };
 type TicketForMutation = {
   currentStatus: TicketStatusValue;
   ownerId: number | null;
+  itPriority: "LOW" | "MEDIUM" | "HIGH";
+  requesterResolvedAt: Date | null;
   version: number;
   owner: { isActive: boolean; role: string } | null;
 };
@@ -1261,7 +1285,7 @@ async function mutateTicket(
     const prisma = getPrisma();
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
-      select: { currentStatus: true, ownerId: true, version: true, owner: { select: { isActive: true, role: true } } },
+      select: { currentStatus: true, ownerId: true, itPriority: true, requesterResolvedAt: true, version: true, owner: { select: { isActive: true, role: true } } },
     });
     if (!ticket) {
       sendError(res, 404, "RESOURCE_NOT_FOUND", "Ticket was not found.");
@@ -1272,15 +1296,30 @@ async function mutateTicket(
       sendError(res, 422, "VALIDATION_ERROR", "Some fields are invalid.", { version: "Version must be a non-negative integer." });
       return;
     }
-    const result = await plan(body, ticket as TicketForMutation, session.user.id);
-    if ("stop" in result) return;
     if (ticket.version !== version) {
       sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh before trying again.");
       return;
     }
-    const updated = await prisma.ticket.updateMany({
-      where: { id: ticketId, version, ...extraWhere(ticket as TicketForMutation), ...(result.where ?? {}) },
-      data: { ...result.data, version: { increment: 1 } },
+    const result = await plan(body, ticket as TicketForMutation, session.user.id);
+    if ("stop" in result) return;
+    const kind = req.path.split("/").at(-1);
+    const updated = await prisma.$transaction(async (tx) => {
+      const change = await tx.ticket.updateMany({
+        where: { id: ticketId, version, ...extraWhere(ticket as TicketForMutation), ...(result.where ?? {}) },
+        data: { ...result.data, version: { increment: 1 } },
+      });
+      if (!change.count) return change;
+      if (kind === "status" && body.status === "RESOLVED") {
+        const reopened = await tx.ticketWorkflowEvent.findFirst({ where: { ticketId, type: "STATUS_CHANGED", changes: { path: ["currentStatus", "after"], equals: "REOPENED" } }, orderBy: { resultingTicketVersion: "desc" } });
+        const qualifying = await tx.actionTaken.findFirst({ where: { ticketId, status: "COMPLETED", ...(reopened ? { completedTicketVersion: { gt: reopened.resultingTicketVersion } } : {}) }, select: { id: true } });
+        if (!qualifying) throw new Error("RESOLUTION_ACTION_REQUIRED");
+      }
+      const field = kind === "status" ? "currentStatus" : kind === "it-priority" ? "itPriority" : "ownerId";
+      const before = field === "currentStatus" ? ticket.currentStatus : field === "ownerId" ? ticket.ownerId : ticket.itPriority;
+      const after = field === "currentStatus" ? body.status : field === "itPriority" ? body.itPriority : kind === "claim" ? session.user.id : body.ownerId;
+      const signalCleared = kind === "status" && transitionRule(ticket.currentStatus, body.status as TicketStatusValue)?.clearsRequesterSignal && ticket.requesterResolvedAt;
+      await tx.ticketWorkflowEvent.create({ data: { ticketId, actorId: session.user.id, type: kind === "status" ? "STATUS_CHANGED" : kind === "it-priority" ? "PRIORITY_CHANGED" : "OWNER_CHANGED", resultingTicketVersion: version + 1, changes: { [field]: { before, after }, ...(signalCleared ? { requesterResolvedAt: { before: ticket.requesterResolvedAt?.toISOString(), after: null } } : {}) } } });
+      return change;
     });
     if (updated.count === 0) {
       sendError(res, 409, "STALE_TICKET", "This Ticket changed. Refresh before trying again.");
@@ -1289,6 +1328,10 @@ async function mutateTicket(
     const detail = await staffTicketDetail(ticketId);
     res.status(200).json({ data: detail });
   } catch (error) {
+    if (error instanceof Error && error.message === "RESOLUTION_ACTION_REQUIRED") {
+      sendError(res, 409, "RESOLUTION_ACTION_REQUIRED", "Complete an action for this Ticket before resolving it.");
+      return;
+    }
     ticketFailure(res, error, `${req.method} ${req.path}`, "The change could not be saved. Please try again.");
   }
 }

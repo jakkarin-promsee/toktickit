@@ -15,7 +15,7 @@ async function ticketFor(email = "anan@example.test") {
   return { ...session, ticketId: created.body.data.id };
 }
 
-afterEach(async () => { if (attachmentIds.length) { await prisma.attachment.deleteMany({ where: { id: { in: attachmentIds } } }); attachmentIds.length = 0; } if (ticketIds.length) { await prisma.ticket.deleteMany({ where: { id: { in: ticketIds } } }); ticketIds.length = 0; } });
+afterEach(async () => { if (attachmentIds.length) { await prisma.attachment.deleteMany({ where: { id: { in: attachmentIds } } }); attachmentIds.length = 0; } if (ticketIds.length) { await prisma.ticketWorkflowEvent.deleteMany({ where: { ticketId: { in: ticketIds } } }); await prisma.ticket.deleteMany({ where: { id: { in: ticketIds } } }); ticketIds.length = 0; } });
 afterAll(async () => { await prisma.$disconnect(); });
 
 describe("Issue #16 authenticated attachment lifecycle API", () => {

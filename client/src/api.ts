@@ -464,6 +464,20 @@ export function getStaffTicketDetail(ticketId: string): Promise<StaffTicketDetai
   return authRequest<StaffTicketDetail>(`/api/staff/tickets/${ticketId}`);
 }
 
+export interface TicketWorkflowEvent {
+  id: string;
+  type: string;
+  actor: PersonRef | null;
+  occurredAt: string;
+  resultingTicketVersion: number;
+  subjectActionId: string | null;
+  changes: Record<string, { before: unknown; after: unknown }>;
+}
+
+export function getTicketWorkflowEvents(ticketId: string): Promise<TicketWorkflowEvent[]> {
+  return authRequest<TicketWorkflowEvent[]>(`/api/staff/tickets/${ticketId}/workflow-events`);
+}
+
 export function getAssignees(): Promise<PersonRef[]> {
   return authRequest<PersonRef[]>("/api/staff/assignees");
 }

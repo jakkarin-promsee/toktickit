@@ -52,6 +52,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await prisma.ticketWorkflowEvent.deleteMany({ where: { ticketId: { in: createdTicketIds } } });
+  await prisma.actionTaken.deleteMany({ where: { ticketId: { in: createdTicketIds } } });
   await prisma.internalNote.deleteMany({ where: { ticketId: { in: createdTicketIds } } });
   await prisma.publicComment.deleteMany({ where: { ticketId: { in: createdTicketIds } } });
   await prisma.attachment.deleteMany({ where: { ticketId: { in: createdTicketIds } } });
@@ -225,6 +227,10 @@ describe("API-10 IT Priority", () => {
 });
 
 describe("API-10 status transitions", () => {
+  async function qualifyingAction(ticketId: string) {
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+    await prisma.actionTaken.create({ data: { ticketId, actionAt: new Date(), description: "Restored service", result: "Confirmed working", status: "COMPLETED", createdByUserId: ticket.ownerId!, performedByUserId: ticket.ownerId!, assigneeId: ticket.ownerId!, followUpRequired: false, completedAt: new Date(), completedByUserId: ticket.ownerId!, completedTicketVersion: ticket.version } });
+  }
   const confirmationRows: [Status, Status][] = [["NEW", "CANCELLED"], ["OPEN", "CANCELLED"], ["IN_PROGRESS", "RESOLVED"], ["RESOLVED", "CLOSED"], ["CLOSED", "REOPENED"]];
 
   it("applies a direct transition without confirmation and records actor/time", async () => {
@@ -240,6 +246,7 @@ describe("API-10 status transitions", () => {
     const staff = await session("narin.staff@example.test");
     for (const [from, to] of confirmationRows) {
       const ticket = await makeTicket({ status: from, ownerEmail: "narin.staff@example.test" });
+      if (to === "RESOLVED") await qualifyingAction(ticket.id);
       const missing = await staff.agent.patch(`/api/staff/tickets/${ticket.id}/status`).set(staff.csrf).send({ status: to, version: 0 });
       expect(missing.status, `${from}>${to}`).toBe(422);
       expect(missing.body.error.fields.confirmed).toBeTruthy();
@@ -285,6 +292,7 @@ describe("API-10 status transitions", () => {
     expect(back.body.data.requesterResolvedAt).toBeNull();
     expect(back.body.data.requesterResolvedBy).toBeNull();
     const resolved = await makeTicket({ status: "WAITING_FOR_REQUESTER", ownerEmail: "narin.staff@example.test", signal: true });
+    await qualifyingAction(resolved.id);
     const done = await staff.agent.patch(`/api/staff/tickets/${resolved.id}/status`).set(staff.csrf).send({ status: "RESOLVED", version: 0, confirmed: true });
     expect(done.body.data.currentStatus).toBe("RESOLVED");
     expect(done.body.data.requesterResolvedAt).toBeTruthy();

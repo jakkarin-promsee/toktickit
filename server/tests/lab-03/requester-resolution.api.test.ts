@@ -37,6 +37,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await prisma.ticketWorkflowEvent.deleteMany({ where: { ticketId: { in: createdTicketIds } } });
   await prisma.internalNote.deleteMany({ where: { ticketId: { in: createdTicketIds } } });
   await prisma.publicComment.deleteMany({ where: { ticketId: { in: createdTicketIds } } });
   await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } });
