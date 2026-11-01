@@ -18,6 +18,7 @@ describe("Issue #15 authenticated Requester Ticket Detail API", () => {
     expect(own.status).toBe(200);
     expect(crossOwner.status).toBe(404);
     expect(crossOwner.body).toEqual(missing.body);
+    await prisma.ticketWorkflowEvent.deleteMany({ where: { ticketId: created.body.data.id } });
     await prisma.ticket.delete({ where: { id: created.body.data.id } });
   });
 });

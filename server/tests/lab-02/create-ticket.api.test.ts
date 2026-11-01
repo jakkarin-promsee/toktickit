@@ -15,6 +15,7 @@ describe("Issue #13 authenticated ticket creation API", () => {
     const response = await agent.post("/api/tickets").set(csrfHeaders(csrfToken)).set("X-Requester-Id", "2").send(validTicket);
     expect(response.status).toBe(201);
     expect(response.body.data).toMatchObject({ requester: { id: 1, displayName: "Anan Chai" }, summary: "Laptop battery drains quickly", currentStatus: "NEW", itPriority: "MEDIUM" });
+    await prisma.ticketWorkflowEvent.deleteMany({ where: { ticketId: response.body.data.id } });
     await prisma.ticket.delete({ where: { id: response.body.data.id } });
   });
 
