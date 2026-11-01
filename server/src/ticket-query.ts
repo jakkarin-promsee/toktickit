@@ -11,6 +11,9 @@ export type TicketSortField = (typeof TICKET_SORT_FIELDS)[number];
 export type TicketSortOrder = "asc" | "desc";
 
 export interface TicketQuery {
+  view?: "open" | "attention" | "recent-updated" | "recent-resolved";
+  from?: Date;
+  through?: Date;
   search: string;
   categoryId?: number;
   relatedSystemId?: number;
@@ -49,6 +52,7 @@ export function parseTicketQuery(input: Record<string, unknown>): TicketQuery {
     "sortOrder",
     "page",
     "pageSize",
+    "view", "from", "through",
   ]);
   for (const key of Object.keys(input)) {
     if (!allowed.has(key)) throw new Error(`Unknown query parameter ${key}.`);
@@ -67,6 +71,15 @@ export function parseTicketQuery(input: Record<string, unknown>): TicketQuery {
   );
   const status = singleValue(input.status, "status");
   if (status !== undefined && status !== "NEW") throw new Error("Invalid status.");
+  const view = singleValue(input.view, "view");
+  if (view !== undefined && !["open", "attention", "recent-updated", "recent-resolved"].includes(view)) throw new Error("Invalid view.");
+  const fromRaw = singleValue(input.from, "from");
+  const throughRaw = singleValue(input.through, "through");
+  const recent = view === "recent-updated" || view === "recent-resolved";
+  if (view && status || recent !== Boolean(fromRaw && throughRaw)) throw new Error("Invalid view filters.");
+  if (!recent && (fromRaw !== undefined || throughRaw !== undefined)) throw new Error("Invalid date filters.");
+  const iso = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
+  if (recent && (!iso.test(fromRaw!) || !iso.test(throughRaw!) || !Number.isFinite(Date.parse(fromRaw!)) || !Number.isFinite(Date.parse(throughRaw!)) || Date.parse(fromRaw!) > Date.parse(throughRaw!))) throw new Error("Invalid date filters.");
 
   const requestedPriority = singleValue(
     input.requestedPriority,
@@ -96,6 +109,9 @@ export function parseTicketQuery(input: Record<string, unknown>): TicketQuery {
   }
 
   return {
+    view: view as TicketQuery["view"],
+    from: fromRaw ? new Date(fromRaw) : undefined,
+    through: throughRaw ? new Date(throughRaw) : undefined,
     search,
     categoryId,
     relatedSystemId,
