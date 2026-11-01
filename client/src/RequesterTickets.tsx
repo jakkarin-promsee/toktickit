@@ -28,19 +28,24 @@ function formatTime(value: string) {
 }
 
 export function MyTickets({ onOpen }: { onOpen: (event: MouseEvent<HTMLAnchorElement>, ticketId: string) => void }) {
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get("view");
+  const filtered = view !== null;
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
   const load = useCallback(() => {
     setState("loading");
-    getMyTickets().then((result) => { setTickets(result.data); setState("ready"); }).catch(() => setState("failed"));
+    const query = filtered ? { view: view as "open" | "attention" | "recent-updated" | "recent-resolved", from: params.get("from") ?? undefined, through: params.get("through") ?? undefined } : {};
+    getMyTickets(query).then((result) => { setTickets(result.data); setState("ready"); }).catch(() => setState("failed"));
   }, []);
   useEffect(load, [load]);
   return (
     <section aria-labelledby="my-tickets-heading">
       <h1 id="my-tickets-heading">My Tickets</h1>
+      {filtered && <p>Filter: {view?.replaceAll("-", " ")} <a href="/tickets" onClick={(event) => { event.preventDefault(); window.history.pushState({}, "", "/tickets"); window.dispatchEvent(new PopStateEvent("popstate")); }}>Clear filters</a></p>}
       {state === "loading" && <p role="status">Loading tickets…</p>}
       {state === "failed" && <div className="alert alert-danger" role="alert">Tickets could not be loaded. <button className="btn btn-sm btn-outline-secondary" onClick={load}>Retry</button></div>}
-      {state === "ready" && tickets.length === 0 && <p className="card zen-card p-3">You have not submitted any tickets yet.</p>}
+      {state === "ready" && tickets.length === 0 && <p className="card zen-card p-3">{filtered ? "No Tickets match this filter." : "You have not submitted any tickets yet."}</p>}
       {state === "ready" && tickets.length > 0 && (
         <ul className="list-unstyled">
           {tickets.map((ticket) => (
